@@ -1,0 +1,4 @@
+gem 'dnscat2-tunneldrivers-dns'
+gem 'trollop'
+gem 'singlogger'
+
