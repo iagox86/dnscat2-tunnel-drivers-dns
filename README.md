@@ -251,7 +251,7 @@ This can be handled in at least two clean ways:
 Currently, this library only supports the former, but may eventually support the
 latter. The protocol is agnostic, since the data is ignored anyways.
 
-## Installation
+## Basic usage
 
 Add this line to your application's Gemfile:
 
@@ -267,13 +267,16 @@ Or install it yourself as:
 
     $ gem install dnscat2-tunneldrivers-dns
 
-## Usage
 
-It can be imported using:
+And import using:
 
     require 'tunnel-drivers-dns'
 
-And initialized as:
+## Detailed usage
+
+### Initialization
+
+The driver is initialized with the following:
 
     driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
       tags:
@@ -284,20 +287,60 @@ And initialized as:
       encoder:
     )
 
-Started with:
+* `tags` is either nil, or an array of strings that represent valid tags (for
+  example, `["abc", "def", "ghi"]`).
+* `domains` is either nil, or an array of strings that represent valid domains
+  (for example, `["example.org", "skullseclabs.org"]`).
+* `sink` is the sink for old data, and the source for new. See the next section!
+* `host` is the host to listen on (`127.0.0.1`, `0.0.0.0`, etc)
+* `port` is the port to listen on (`53` is a nice choice)
+* `encoder` is the encoder to use, as a string - either `"hex"` or "`base32`"
 
-    driver.start()
+Most of the communication is done with the sink. The `start()` and `stop()`
+methods are also pretty important. More information below!
 
-Stopped (optionally) with:
+### Sink
 
-    driver.stop()
+The sink, which I also call a controller, is a class that implements, at a
+minimum, a single method: `feed(data:, max_length:)`.
 
-Or the program can simply terminate. Additionally, if you need the program to 
-wait until it's finished, you can use
+When data arrives over DNS, the data is sent to `feed()` via the `data:`
+argument. The `max_length:` argument tells the controller the maximum amount of
+data the protocol can handle. It's expected to return between `0` and
+`max_length:` bytes of binary data.
 
-    driver.join()
+Any error raised is caught, and transmitted back to the client as an error
+condition. That's the best way to handle any kind of error condition at this
+level of the protocol (in theory, higher level protocols should have their own
+error handling mechanism).
 
-TODO: Meaning of the parameters, sink
+### Start and stop
+
+The driver doesn't immediately start listening for data. Instead, it sits idle
+until the `start()` method is called. At that point, it attempts to open a
+socket and start listening on the prescribed port.
+
+When everything is complete, the driver can be stopped with `stop()`, or the
+script can simply be exited.
+
+### Errors
+
+Any errors that occur, such as calling `start()` or `stop()` in the wrong state,
+will raise a `Dnscat2::TunnelDrivers::DNS::Exception`.
+
+### Wait
+
+If the DNS driver is the only thing going on, you can wait for it to finish
+by using the `wait()` method. It is essentially the same as using `join()` on
+the thread.
+
+### Logging
+
+Logging uses the [SingLogger](https://github.com/iagox86/singlogger) (Singleton
+Logger) library I wrote. If you want to change the sink for the logger, be sure
+to initialize it in your script before including any driver files.
+
+The log level can be changed any time.
 
 ## Contributing
 
