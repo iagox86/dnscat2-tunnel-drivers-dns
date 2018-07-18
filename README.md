@@ -3,78 +3,98 @@
 This is a "tunnel driver" for dnscat2 (specifically, dnscat2-core).
 
 A tunnel driver is a "driver" that sits between dnscat2 and the Internet.
-Despite the project's name, a dnscat2 driver can use any protocol - TCP, UDP,
-ICMP, HTTPS, etc.
+Despite the project's name, a dnscat2 driver can theoretically use any protocol
+(TCP, UDP, ICMP, HTTPS, etc.). In practice, it is optimized for one-way
+client-to-server request/response communication (DNS, ping, etc)
 
 This driver, in particular, implements dnscat2's namesake protocol: DNS. It
 implements encoding and decoding to a number of record types, and in two
 different formats: hex and base32.
 
 This README should be considered the authoritative source for the dnscat2
-DNS tunnel protocol, superseding others.
+Tunnel Protocol for DNS, superseding all others (although it is nearly identical
+to the previous, as far as I'd documented it).
+
+## Concept
+
+The basic concept is: this driver starts a DNS server on port 53, using the
+[Nesser](https://github.com/iagox86/nesser) library.
+
+Data enters via a DNS request, encoded into the requested name.
+
+The data is decoded and send to a "sink", which is how the data is processed and
+how the response (if any) is generated.
+
+The outgoing data is encoded as whatever record type was requested (or any of
+them if ANY was the requested type), and returned.
+
+Repeat on a timer.
 
 ## Protocol
 
-The basic concept is: this starts a DNS server on port 53, using the
-[Nesser](https://github.com/iagox86/nesser) library. Data enters via a DNS
-request, encoded into the requested name. The data is decoded and send to a
-"sink", which returns the data that is to be sent out (if any). The outgoing
-data is encoded as whatever record type was requested (or any of them if ANY
-was the requested type), and returned.
+This protocol is essentially layer 2 - it's simply data on the wire.
 
-In order to do all that, we're going to have to cover an awful lot of ground!
-So let's look at those generally in order.
+There are no guarantees that data will arrive, will be acknowledged, or won't
+be duplicated (DNS lovvvvves duplicating data).
 
-This protocol is essentially layer 2 - it's simply data on the wire. There are
-no guarantees that data will arrive, will be acknowledged, or won't be
-duplicated (DNS lovvvvves duplicating data). If guarantees are needed - which
-is generally the case - a higher level protocol is required (which is where
+If guarantees are needed - which is generally the case - a higher level
+protocol is required (which is where
 [dnscat2-core](https://github.com/iagox86/dnscat2-core) comes into play).
 
 ### Encoding
 
 Encoding is required throughout, as this protocol is designed to transport
-binary data via a limited character set (frequently, DNS names). As discussed,
-the encoding options are hex and base32.
+binary data via a limited character set (frequently, DNS names). The client and
+server are both required to encode names in most cases. The current options for
+encoding are hex and base32.
 
-Due to space and character set limitations, I have decided that the best way to
-select between encoding schemes is simple pre-arrangement: the client and server
-select the one they wish to use beforehand. The official implementation herein
-supports both, but clients may choose to use one or the other.
+Due to space and character set limitations, the only reasonable way to select
+between the different encoding schemes is simple pre-agreement: the client
+and server select the one they wish to use beforehand. The official
+implementation herein supports both, but clients may choose to use one or the
+other.
 
-Encoding in hex is simple: the characters are `0`-`9` and `a`-`f`. Case MUST be
-ignored (as some intermediate DNS servers change case), and periods MUST be
-ignored as well (they'll be discussed later). Any packet that contains an odd
-number of characters, or characters that are not in the correct character
-set, can be handled however the implementation chooses. That being said,
+I strongly recommend using base32, simply because it is more efficient, and
+somewhat less obvious "on the wire", in part due to old versions of dnscat2
+exclusively using hex, and in part due to hex-encoded ASCII being fairly common
+knowledge at this point.
+
+Encoding in hex is simple: the data is simply converted to ASCII. The
+characters are `0`-`9` and `a`-`f`. Case MUST be ignored (as some intermediate
+DNS servers change case), and periods MUST be ignored as well (they'll be
+discussed later).
+
+Any packet that contains an odd number of characters, or characters that are
+not in the correct character set (not counting the tag or domain, discussed
+later), can be handled however the implementation chooses. That being said,
 dropping messages is bad on DNS, since it will cause a ton of chatter, so
-responding with an error packet (such as SERVFAIL or NXDOMAIN) is likely the
+responding with an error packet (such as ServFail or NXDomain) is likely the
 best option.
 
-Encoding in base32 is a little more involved, since there isn't a neat 1:2
+Encoding in base32 is a little more involved, since there isn't a neat
 translation. The data is encoded as outlined
 [here](https://tools.ietf.org/html/rfc4648), and can be tested in the browser
 [on this page](https://emn178.github.io/online-tools/base32_encode.html).
 
 Once again, due to the nature of DNS, case MUST be ignored. Additionally, the
 padding symbols (`=` signs) are removed in transit, and re-added (or ignored)
-during decoding.
+during decoding. If re-adding, `=` signs are appended until the data's lengthis
+a multiple of 8 (unless it started as one).
 
 ### Names
 
 Names are a special case, because they must conform to DNS naming standards,
 which states:
-* Domain names are made up of multiple segments (eg, "a.b.c"), where each
-  segment is no more than 63 bytes
+* Names are made up of period-separated segments (eg, `"a.b.c"`), where each
+  segment is at least 1 byte and no more than 63 bytes long
 * All text is case insensitive
 * The set of allowed characters are `a-z`, `0-9`, and `-`, though a domain
-  cannot start with `-`; periods are also allowed, as a separator character,
-  but are handled specially (and cannot be adjacent)
+  cannot start with `-`
 
-For the purposes of transporting data, during encoding periods can be sprinkled
-throughout a name as desired, within the parameters of DNS, and MUST be ignored
-by the recipient. `414141.example.org` is identical to `4.1.414.1.example.org`,
-for example.
+For the purposes of transporting data, the protocol allows periods to be
+sprinkled throughout a name as desired, within the parameters of DNS outlined
+above, and MUST be ignored by the recipient. `414141.example.org` is identical
+to `4.1.414.1.example.org`, for example.
 
 A `tag` must be prepended, or a `domain` appended. One or the other MUST be
 present, but both MAY NOT be.
@@ -341,6 +361,10 @@ Logger) library I wrote. If you want to change the sink for the logger, be sure
 to initialize it in your script before including any driver files.
 
 The log level can be changed any time.
+
+## Examples
+
+TODO
 
 ## Contributing
 
