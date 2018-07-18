@@ -22,7 +22,7 @@ VERSION = "0.0.0"
 MY_NAME = "tunnel-driver-dns-example-echo v#{VERSION}"
 
 DEFAULT_HOST = '0.0.0.0'
-DEFAULT_PORT = 53533
+DEFAULT_PORT = 53
 DEFAULT_ENCODER = 'hex'
 DEFAULT_TAGS = nil
 DEFAULT_DOMAINS = nil

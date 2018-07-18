@@ -15,6 +15,23 @@ This README should be considered the authoritative source for the dnscat2
 Tunnel Protocol for DNS, superseding all others (although it is nearly identical
 to the previous, as far as I'd documented it).
 
+**CURRENT STATUS: DRAFT**
+
+## TODO
+
+This document needs tested max length values for names and each record type
+
+The trailing period here is concerning:
+
+    $ dig @localhost -p 53533 +short -t ANY abc.41424344
+    abc.44434241.
+
+As is the leading period here:
+
+    D, [2018-07-18T13:04:18.639225 #32553] DEBUG -- : TunnelDrivers::DNS::Readers::Standard Message is for me, based on tag! abc.41424344
+    D, [2018-07-18T13:04:18.639247 #32553] DEBUG -- : TunnelDrivers::DNS::Readers::Standard Decoding .41424344...
+
+
 ## Concept
 
 The basic concept is: this driver starts a DNS server on port 53, using the
@@ -78,33 +95,35 @@ translation. The data is encoded as outlined
 
 Once again, due to the nature of DNS, case MUST be ignored. Additionally, the
 padding symbols (`=` signs) are removed in transit, and re-added (or ignored)
-during decoding. If re-adding, `=` signs are appended until the data's lengthis
-a multiple of 8 (unless it started as one).
+during decoding. If re-adding `=` signs, zero or more are appended to make the
+data's length is a multiple of 8 charcters.
 
 ### Names
 
 Names are a special case, because they must conform to DNS naming standards,
-which states:
+which states, in brief:
 * Names are made up of period-separated segments (eg, `"a.b.c"`), where each
   segment is at least 1 byte and no more than 63 bytes long
-* All text is case insensitive
+* All text is case insensitive, and can randomly change in transit
 * The set of allowed characters are `a-z`, `0-9`, and `-`, though a domain
-  cannot start with `-`
+  cannot start with `-` (for simplicity, we don't use `-` for anything)
 
-For the purposes of transporting data, the protocol allows periods to be
+For the purposes of transporting data, the tunnel protocol allows periods to be
 sprinkled throughout a name as desired, within the parameters of DNS outlined
-above, and MUST be ignored by the recipient. `414141.example.org` is identical
-to `4.1.414.1.example.org`, for example.
+above, and MUST be ignored by the recipient. `414141.example.org` is
+functionally identical to `4.1.414.1.example.org`, for example.
 
-A `tag` must be prepended, or a `domain` appended. One or the other MUST be
-present, but both MAY NOT be.
+To confirm to the tunnel protocol, a `tag` must be prepended, or a `domain`
+appended. One or the other MUST be present, but both MAY NOT be.
 
 A `tag` is a pre-arranged value that is prepended, such as `abc.<data>`. It is
 designed to uniquely identify traffic as tunnel traffic. Traditionally, dnscat2
 uses `dnscat` as the tag, and will likely continue to. But the protocol itself
-can use any pre-arranged tag. Since there's no valid domain name involved,
-messages with a tag are not designed to traverse the DNS hierarchy, and are only
-to be used for direct "connections".
+can use any pre-arranged tag.
+
+Since there's no valid domain name involved, messages with a tag (rather than a
+domain) are not DNS-routable names. Therefore, they will not traverse the DNS
+hierarchy, and are only to be used for direct "connections".
 
 I find it helpful to use a hardcoded tag by default, unless a domain name is
 specifically requested. That way, it "just works" if no configuration is done!
@@ -112,7 +131,8 @@ specifically requested. That way, it "just works" if no configuration is done!
 A `domain` is likewise a pre-arranged value, but in this case it is appended,
 and is further used to route the message through the real DNS hierarchy. A
 domain name such as "example.org" is appended. In theory, the server should be
-running on the authoritative DNS server for that domain.
+running on the authoritative DNS server for that domain, but it will still work
+with a direct connection the same way as a tag.
 
 The overall length for a name cannot exceed 253 bytes, including tag/domain and
 the periods. When that is made into a DNS message, it's actually 255 bytes
@@ -120,12 +140,16 @@ the periods. When that is made into a DNS message, it's actually 255 bytes
 prefix and a null terminator).
 
 To summarize: data is encoded in a pre-agreed-upon format (hex or base32).
-Periods are added by the encoder and removed/ignored by the decoder. A tag
-is prepended or a domain is appended. And that's that!
+Periods are added by the encoder with at least 1 character between and at most
+63 characters between. They are to be removed/ignored by the decoder. A tag is
+prepended or a domain is appended. And that's that!
+
+These are used in all requests (questions), and in some types of responses
+(answers) - specifically, `CNAME`, `NS`, and `MX`, as we'll see shortly.
 
 ### Client -> server (requests)
 
-To deliver data from a client to the server, a DNS packet must be sent with the
+To deliver data from a client to the server, a DNS packet MUST be sent with the
 data encoded into it.
 
 The DNS should be a standard DNS packet (RFC1035), with a single `question`
@@ -133,30 +157,32 @@ record. A question has a `name`, `type`, and `class`.
 
 The `name` MUST be the outgoing data, encoded as discussed above. The name MUST
 either start with a tag or end with a domain. Sending zero bytes of data (ie,
-just the tag or domain) is absolutely possible.
+just the tag or domain) is absolutely possible. But caching can become an issue
+(see below for discussion on caching).
 
 The `type` can be one of the following DNS types: `A`, `AAAA`, `CNAME`, `NS`,
 `MX`, or `TXT`. Additionally, it can also be `ANY`. The server's response will
 be in the requested type (see below).
 
-The `class` MUST be `IN`, or Internet, which is the only supported class.
+The `class` MUST be `IN` (`0x0001`), which is the only supported class.
 
 ### Server -> client (responses)
 
 The server MUST respond to every client request in some way - even if it is
 simply with a DNS error.
 
-Outgoing responses are sent as a standard DNS response. The transaction id field
-MUST match the request, the question field MUST match the requests question
-field, and so on - a normal DNS response, in other words.
+Responses are sent as a standard DNS response. Like any DNS response, the
+transaction id field MUST match the request, the question field MUST match the
+requests question field, the `R` flag MUST be set, and so on.
 
 The data is encoded into the answer record(s), in accordance with the type
 that the question requested: `A`, `AAAA`, `CNAME`, `NS`, `MX`, or `TXT`. If the
 request was for `ANY` type, it's up to the server which type to use (in general,
 it's nice to randomize it or use round-robin).
 
-A server SHOULD endeavour to support every type. A client MAY support any one or
-more types, since the client can choose which record type they want to use.
+A server SHOULD endeavour to support every type listed here. A client MAY
+support any one or more types, since the client can choose which record type
+they want to use.
 
 The actual encoding of the data varies based on the record type.
 
@@ -182,10 +208,12 @@ a name encoded exactly like a request name, including tag or domain.
 #### `MX` record
 
 An `MX` record is essentially the same as `CNAME`/`NS` - the name is encoded
-into the `exchange` field as a typical name. The `MX` record type also defined
-a `preference` field, which can have any random value (the client MUST ignore
-it). I randomize it between `[10, 20, 30, 40, 50]`, because those are realistic
-values, but the client MUST discard that value anyways.
+into the `exchange` field as a typical name.
+
+The `MX` record type also defines a `preference` field, which can have any
+random value (the client MUST ignore it). I randomize it between
+`[10, 20, 30, 40, 50]`, because those are realistic values, but the client MUST
+ignore/discard that value.
 
 #### `A` and `AAAA` records
 
@@ -304,9 +332,10 @@ The driver is initialized with the following:
       sink:
       host:
       port:
-      encoder:
+      [...optional settings]
     )
 
+The main parameters are:
 * `tags` is either nil, or an array of strings that represent valid tags (for
   example, `["abc", "def", "ghi"]`).
 * `domains` is either nil, or an array of strings that represent valid domains
@@ -314,6 +343,8 @@ The driver is initialized with the following:
 * `sink` is the sink for old data, and the source for new. See the next section!
 * `host` is the host to listen on (`127.0.0.1`, `0.0.0.0`, etc)
 * `port` is the port to listen on (`53` is a nice choice)
+
+The optional settings are:
 * `encoder` is the encoder to use, as a string - either `"hex"` or "`base32`"
 
 Most of the communication is done with the sink. The `start()` and `stop()`
@@ -326,13 +357,14 @@ minimum, a single method: `feed(data:, max_length:)`.
 
 When data arrives over DNS, the data is sent to `feed()` via the `data:`
 argument. The `max_length:` argument tells the controller the maximum amount of
-data the protocol can handle. It's expected to return between `0` and
-`max_length:` bytes of binary data.
+data the protocol can handle right now (it can and will vary between calls, so
+it MUST NOT be stored). It's expected to return between `0` and `max_length:`
+bytes of binary data, or `nil`.
 
 Any error raised is caught, and transmitted back to the client as an error
-condition. That's the best way to handle any kind of error condition at this
-level of the protocol (in theory, higher level protocols should have their own
-error handling mechanism).
+condition (`NXDomain` or `ServFail`). That's the best way to handle any kind of
+error condition at this level of the protocol (in theory, higher level
+protocols should have their own error handling mechanism).
 
 ### Start and stop
 
@@ -364,7 +396,57 @@ The log level can be changed any time.
 
 ## Examples
 
-TODO
+### dns-echo
+
+[dns-echo](examples/dns-echo.rb) is a simple script that simply echoes back the
+data that it receives. A few transformations are also supported - `--upcase`,
+`--downcase`, `--reverse`, and `--rot13` will transform the data in that way
+before returning it.
+
+Example of running it:
+
+    $ ruby examples/dns-echo.rb --tags 'abc' --port=53535 --reverse
+    D, [2018-07-18T12:59:47.256988 #31816] DEBUG -- : TunnelDrivers::DNS New instance! tags = ["abc"], domains = , sink = #<Controller:0x000000000203f348>, host = 0.0.0.0, port = 53533
+    I, [2018-07-18T12:59:47.257260 #31816]  INFO -- : TunnelDrivers::DNS Starting DNS tunnel!
+
+Then making a request, the data must be encoded. If not specified, the default
+encoder is hex:
+
+    $ dig @localhost -p 53533 +short abc.41424344
+    0.4.68.67
+    1.66.65.255
+
+Note that it responds as an A record by default (it's `dig`'s default, not
+ours). The data is `68 67 66 65` in decimal, which is `44434241` in hex.
+
+We can also get a CNAME or TXT record, for example:
+
+    $ dig @localhost -p 53533 +short -t CNAME abc.41424344
+    abc.44434241.
+    
+    $ dig @localhost -p 53533 +short -t TXT abc.41424344
+    "44434241"
+
+Or ANY:
+
+    $ dig @localhost -p 53533 +short -t ANY abc.41424344
+    0.4.68.67
+    1.66.65.255
+    
+    $ dig @localhost -p 53533 +short -t ANY abc.41424344
+    
+    50 abc.44434241.
+    $ dig @localhost -p 53533 +short -t ANY abc.41424344
+    abc.44434241.
+    
+    $ dig @localhost -p 53533 +short -t ANY abc.41424344
+    abc.44434241.
+    
+    $ dig @localhost -p 53533 +short -t ANY abc.41424344
+    0.4.68.67
+    1.66.65.255
+
+
 
 ## Contributing
 
