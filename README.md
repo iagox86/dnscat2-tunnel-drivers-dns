@@ -31,110 +31,166 @@ duplicated (DNS lovvvvves duplicating data). If guarantees are needed - which
 is generally the case - a higher level protocol is required (which is where
 [dnscat2-core](https://github.com/iagox86/dnscat2-core) comes into play).
 
-### Incoming requests
+### Encoding
 
-When a request is made, data is encoded directly into the name. The scheme is
-generally decided in advance and agreed on for the client and server, but it can
-also be requested specifically by the client instead (see the encoding section
-below for more information).
+Encoding is required throughout, as this protocol is designed to transport
+binary data via a limited character set (frequently, DNS names). As discussed,
+the encoding options are hex and base32.
 
-A request containing the data `AAAA` will be encoded as `41414141` in hex, or
-`ifaucqi` in base32. From here on we'll use hex, since it's easier to convert
-mentally.
+Due to space and character set limitations, I have decided that the best way to
+select between encoding schemes is simple pre-arrangement: the client and server
+select the one they wish to use beforehand. The official implementation herein
+supports both, but clients may choose to use one or the other.
 
-This request needs to be identified as a dnscat2 request, so we don't
-waste a ton of time and effort trying to decode random traffic. It is done by
-either prepending a `tag`, such as `abc.41414141`, or appending a domain, such
-as `41414141.example.org`.
+Encoding in hex is simple: the characters are `0`-`9` and `a`-`f`. Case MUST be
+ignored (as some intermediate DNS servers change case), and periods MUST be
+ignored as well (they'll be discussed later). Any packet that contains an odd
+number of characters, or characters that are not in the correct character
+set, can be handled however the implementation chooses. That being said,
+dropping messages is bad on DNS, since it will cause a ton of chatter, so
+responding with an error packet (such as SERVFAIL or NXDOMAIN) is likely the
+best option.
 
-Traditionally, dnscat2 has done this by using the domain provided on the
-commandline, or, if none was, by prepending the tag `dnscat`. This will likely
-continue.
+Encoding in base32 is a little more involved, since there isn't a neat 1:2
+translation. The data is encoded as outlined
+[here](https://tools.ietf.org/html/rfc4648), and can be tested in the browser
+[on this page](https://emn178.github.io/online-tools/base32_encode.html).
 
-The client MUST either prepend a `tag` or append a `domain`. The server MUST
-attempt to parse any request with a known `tag` or `domain`.
+Once again, due to the nature of DNS, case MUST be ignored. Additionally, the
+padding symbols (`=` signs) are removed in transit, and re-added (or ignored)
+during decoding.
 
-The DNS protocol does not allow any "subdomain" (such as `a` in `a.example.org`)
-to be longer than 63 bytes, so it's necessary to break it into multiple chunks.
-The protocol is agnostic as to how many dots are in the name and where they are.
-As such, `4.1.4.1.example.org` is functionally identical to `41.41.example.org`,
-`414.1.example.com`, and `4141.example.com`.
+### Names
 
-The client can choose how to place the dots for either efficiency (63-byte
-subdomains) or stealth (normal-length subdomains). It does not matter.
+Names are a special case, because they must conform to DNS naming standards,
+which states:
+* Domain names are made up of multiple segments (eg, "a.b.c"), where each
+  segment is no more than 63 bytes
+* All text is case insensitive
+* The set of allowed characters are `a-z`, `0-9`, and `-`, though a domain
+  cannot start with `-`; periods are also allowed, as a separator character,
+  but are handled specially (and cannot be adjacent)
 
-### Sink
+For the purposes of transporting data, during encoding periods can be sprinkled
+throughout a name as desired, within the parameters of DNS, and MUST be ignored
+by the recipient. `414141.example.org` is identical to `4.1.414.1.example.org`,
+for example.
 
-The sink is a programming concept rather than a protocol one, so I don't want
-to expound on it here (check out the Usage section below).
+A `tag` must be prepended, or a `domain` appended. One or the other MUST be
+present, but both MAY NOT be.
 
-Essentially, *something* takes the data that comes in, does something with it,
-and returns data to send out.
+A `tag` is a pre-arranged value that is prepended, such as `abc.<data>`. It is
+designed to uniquely identify traffic as tunnel traffic. Traditionally, dnscat2
+uses `dnscat` as the tag, and will likely continue to. But the protocol itself
+can use any pre-arranged tag. Since there's no valid domain name involved,
+messages with a tag are not designed to traverse the DNS hierarchy, and are only
+to be used for direct "connections".
 
-The takeaway to remember here is that DNS is a request-response protocol. In
-order for the server to send data to the client, data (even if it's a blank
-packet) has to come in.
+I find it helpful to use a hardcoded tag by default, unless a domain name is
+specifically requested. That way, it "just works" if no configuration is done!
 
-### Outgoing responses
+A `domain` is likewise a pre-arranged value, but in this case it is appended,
+and is further used to route the message through the real DNS hierarchy. A
+domain name such as "example.org" is appended. In theory, the server should be
+running on the authoritative DNS server for that domain.
 
-Outgoing responses are encoded into the record type that was requested by the
-client. The currently supported types are `A`, `AAAA`, `CNAME`, `NS`, `MX`, and
-`TXT`. If the request is for `ANY`, it's up to the server which type to use (in
-general, it's nice to randomize it).
+The overall length for a name cannot exceed 253 bytes, including tag/domain and
+the periods. When that is made into a DNS message, it's actually 255 bytes
+(there is, in a sense, a leading and trailing period we don't see - a length
+prefix and a null terminator).
 
-How the data is actually encoded actually depends on the record type. Since the
-encoding for the record type varies a little bit, we'll look at them
-individually.
+To summarize: data is encoded in a pre-agreed-upon format (hex or base32).
+Periods are added by the encoder and removed/ignored by the decoder. A tag
+is prepended or a domain is appended. And that's that!
+
+### Client -> server (requests)
+
+To deliver data from a client to the server, a DNS packet must be sent with the
+data encoded into it.
+
+The DNS should be a standard DNS packet (RFC1035), with a single `question`
+record. A question has a `name`, `type`, and `class`.
+
+The `name` MUST be the outgoing data, encoded as discussed above. The name MUST
+either start with a tag or end with a domain. Sending zero bytes of data (ie,
+just the tag or domain) is absolutely possible.
+
+The `type` can be one of the following DNS types: `A`, `AAAA`, `CNAME`, `NS`,
+`MX`, or `TXT`. Additionally, it can also be `ANY`. The server's response will
+be in the requested type (see below).
+
+The `class` MUST be `IN`, or Internet, which is the only supported class.
+
+### Server -> client (responses)
+
+The server MUST respond to every client request in some way - even if it is
+simply with a DNS error.
+
+Outgoing responses are sent as a standard DNS response. The transaction id field
+MUST match the request, the question field MUST match the requests question
+field, and so on - a normal DNS response, in other words.
+
+The data is encoded into the answer record(s), in accordance with the type
+that the question requested: `A`, `AAAA`, `CNAME`, `NS`, `MX`, or `TXT`. If the
+request was for `ANY` type, it's up to the server which type to use (in general,
+it's nice to randomize it or use round-robin).
+
+A server SHOULD endeavour to support every type. A client MAY support any one or
+more types, since the client can choose which record type they want to use.
+
+The actual encoding of the data varies based on the record type.
 
 #### `TXT` records
 
-A `TXT` record is pretty much free-form: you specify binary data in whatever
-format or structure you want. But, there's a problem: some libraries don't
-handle NUL bytes (`\x00`) very well (I'm looking at you, Windows!). As a result,
-if we want to be compatible with OS resolvers (we do), we unfortunately have
-to encode the data.
+A `TXT` response consists of a single `TXT` record, with encoded data.
 
-As a result, data that is returned in a `TXT` record is encoded in the same format
-as the incoming data (hex or base32) and stuffed into a `TXT` record that is
-returned.
+In general, a `TXT` record is pretty much free-form: you specify binary data in
+whatever format or structure you want. But, there's a problem: some libraries
+don't handle NUL bytes (`\x00`) very well (I'm looking at you, Windows!). As a
+result, if we want to be compatible with OS resolvers (we do), we unfortunately
+have to encode the data.
+
+A `TXT` response is simply encoded as either hex or base32, as agreed upon.
+Otherwise, the data is stuck into a standard TXT packet (which also has a length
+prefix).
 
 #### `CNAME` and `NS` records
 
-A `CNAME` and `NS` record are essentially the same: a name is simply returned.
-The data is encoded into a name in the exact same way as the name in the
-request: encoded into a domain that either starts with the tag or ends with the
-domain. Like encoding the request, periods can be inserted anywhere, and you
-can add as much data as the protocol allows, or as little data as you like.
+A `CNAME` or `NS` response encodes a single record of the requested type, with
+a name encoded exactly like a request name, including tag or domain.
 
 #### `MX` record
 
 An `MX` record is essentially the same as `CNAME`/`NS` - the name is encoded
-into the `exchange` field as a typical name (with tag or domain). The `MX`
-record type also defined a `preference` field, which can have any random value
-(the client MUST ignore it). I randomize it between `[10, 20, 30, 40, 50]`,
-because those are realistic values.
+into the `exchange` field as a typical name. The `MX` record type also defined
+a `preference` field, which can have any random value (the client MUST ignore
+it). I randomize it between `[10, 20, 30, 40, 50]`, because those are realistic
+values, but the client MUST discard that value anyways.
 
 #### `A` and `AAAA` records
 
-We finally come to the hardest record types: `A` and `AAAA`.
+Data encoded into `A` or `AAAA` records are split across as many records as
+desired (that fit into a DNS packet), with bits of data and sequence numbers in
+each.
 
-These are tricky, because multiple records are required (unless you want to send
-three bytes at a time). I found out the hard way that DNS servers on the
-Internet can re-arrange the records, so each record MUST be indexed. On the
-plus side, encoding is not necessary, so data is sent as pure binary.
+There are several challenges with using these record types. For example, from
+experimentation, I found out (the hard way) that records can be rearranged in
+transit, so each field MUST contain a sequence number. Additionally, because
+data may not be a length that's a multiple of the field length, a length prefix
+is also required.
 
-First, each record in the field starts with a sequence number. The actual
-numbers aren't too important, just that each record has a higher number than
-the previous (so `1, 2, 3, 4, ...` is as valid as `1, 15, 20, 33, 100, 101,
-...`).
+To overcome these problems, the first octet in each record is a sequence number.
+The actual values don't matter, as long as each one is larger than the previous
+(so `1, 2, 3, 4, ...` is as valid as `1, 15, 20, 33, 100, 101, ...`).
 
-Second, the second value is the total length (in bytes) of the data being
-transferred.
+Additionally, the second octet in the first record is the total length (in
+bytes) of the data being transferred.
 
-Finally, the last addresses is padded out with whatever value you like to make
-up a full address (I use `\xFF`).
+Finally, the last addresses is padded out to the full address length with
+any value to make up a full address (I use `\xFF`). The client MUST discard that
+value.
 
-After that, the data is encoded (byte by byte) into addresses: either IPv4 or
+Otherwise, the data is encoded (byte by byte) into addresses: either IPv4 or
 IPv6 addresses.
 
 Let's look at encoding `"ABCDEFGHI"` in IPv4:
@@ -152,8 +208,48 @@ Now let's encode the full alphabet - `"ABCDEFGHIJKLMNOPQRSTUVWXYZ"` - as IPv6:
 * `14f:5051:5253:5455:5657:5859:5aff:ffff` - The sequence number is `11`, the
   values from `4f` to `5a` are data, and the `ff:ffff` at the end is padding.
 
-Keep in mind that when you see these values on the wire, they may be in a
-different order! Hence, the sequence numbers.
+#### Errors
+
+If an error occurs, it is still important to respond in one way or another.
+Otherwise, the DNS infrastructure gets angry and will retransmit like crazy.
+A higher level protocol MAY re-define how errors are transmitted and handled,
+but if an error reaches this library, it will respond with either an `NXDomain`
+("name not found") for a "normal" error (one that we generated), or `ServFail`
+("server error") for anything else.
+
+### Other notes
+
+#### Caching
+
+Caching is a huge problem! If the client sends the same request more than once,
+the server most likely will NOT see the second request. This problem is not
+solved at this protocol layer, but higher level protocols SHOULD endeavour to
+handle this, if it is an issue.
+
+A typical solution is to include random data or sequence number in the protocol.
+
+#### Retransmission
+
+DNS does a ton of duplication and gratuitous retransmission. As such, you will
+almost certainly see duplicate packets arrive.
+
+Again, this is NOT solved at this protocol layer, and SHOULD be solved at higher
+level layers, if this is a problem.
+
+#### Packets without a tag/domain
+
+If a packet is received with no tag nor domain, that means it likely isn't
+destined for us. The Internet is full of random DNS traffic.
+
+The packet's data SHOULD be ignored; however, it is necessary to respond to the
+packet. Otherwise, retransmissions and such will become noisy.
+
+This can be handled in at least two clean ways:
+* Respond with an error, such as `NXDomain`; or
+* Forward the request to a "real" DNS server - a "passthrough"
+
+Currently, this library only supports the former, but may eventually support the
+latter. The protocol is agnostic, since the data is ignored anyways.
 
 ## Installation
 
