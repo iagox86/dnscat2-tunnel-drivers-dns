@@ -1,4 +1,4 @@
-# Dnscat2::Tunneldrivers::Dns
+# Dnscat2::TunnelDrivers::DNS
 
 This is a "tunnel driver" for dnscat2 (specifically, dnscat2-core).
 
