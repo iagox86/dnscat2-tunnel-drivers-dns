@@ -14,9 +14,7 @@
 # guarantees at this level. That's expected to be handled by the dnscat2
 # protocol.
 #
-# See README.md in this repository for gory detail!
-#
-# TODO: Handle record type `any`
+# I have documented this like crazy in README.md, so you best check that out!
 ##
 
 require 'nesser'
@@ -43,6 +41,7 @@ module Dnscat2
   module TunnelDrivers
     module DNS
       class Driver
+        # A simple map of all the "builders" we support
         BUILDERS = {
           ::Nesser::TYPE_A     => Builders::A,
           ::Nesser::TYPE_AAAA  => Builders::AAAA,
@@ -52,6 +51,10 @@ module Dnscat2
           ::Nesser::TYPE_TXT   => Builders::TXT,
         }
 
+        ##
+        # Take a question, unpack it, pass it to the sink, get the data back,
+        # and encode the message into a series of resource records.
+        ##
         private
         def _handle_question(question:)
           # We need to be able to set the question_type separate from
@@ -95,9 +98,10 @@ module Dnscat2
             raise(Exception, "The sink returned too much data: #{outgoing_data.length}, max_length was #{builder.max_length}")
           end
 
-          # Encode it
+          # Encode it into one or more resource records
           rrs = builder.build(data: outgoing_data)
 
+          # Stuff each resource record into an Answer object
           return rrs.map() do |rr|
             Nesser::Answer.new(
               name: question.name,
@@ -109,6 +113,10 @@ module Dnscat2
           end
         end
 
+        ##
+        # Unpack and sanity check a transaction. This is also where all
+        # exceptions are handled.
+        ##
         private
         def _handle_transaction(transaction:)
           begin
@@ -142,6 +150,20 @@ module Dnscat2
           end
         end
 
+        ##
+        # Create an instance of the tunnel driver.
+        #
+        # tags: An array of tags (prefixes) that we are listening for (or nil)
+        # domains: An array of domains (postfixes) that we are listening for (or
+        #   nil)
+        # sink: The sink to send data to and get it from (simply a class that
+        #   has one method: `feed(data:, max_length:)`. For more information,
+        #   see README.md
+        # host: The ip address to listen on
+        # port: The port to listen on
+        # settings: Any other settings that we decide to define (such as
+        #   `encoder:`)
+        ##
         public
         def initialize(tags:, domains:, sink:, host:"0.0.0.0", port:53, **settings)
           @l = SingLogger.instance()
@@ -163,6 +185,13 @@ module Dnscat2
           @mutex = Mutex.new()
         end
 
+        ##
+        # Start the driver. If this is called while it's already started,
+        # `Exception` is thrown.
+        #
+        # If no socket is passed in, a new UDPSocket is created.
+        ##
+        public
         def start(s:nil, auto_close_socket:true)
           @l.info("TunnelDrivers::DNS Starting DNS tunnel driver!")
           @mutex.synchronize() do
@@ -170,7 +199,7 @@ module Dnscat2
               raise(Exception, "DNS tunnel is already running")
             end
 
-            @s = UDPSocket.new()
+            @s = ::UDPSocket.new()
             @auto_close_socket = auto_close_socket
             @nesser = Nesser::Nesser.new(s: @s, logger: @l, host: @host, port: @port) do |transaction|
               _handle_transaction(transaction: transaction)
@@ -178,6 +207,13 @@ module Dnscat2
           end
         end
 
+        ##
+        # Stop the driver. If thi sis called while it's already stopped,
+        # `Exception` is thrown.
+        #
+        # Also closes the socket if `auto_close_socket` was `true` when
+        # `start()` was called.
+        ##
         public
         def stop()
           @l.info("TunnelDrivers::DNS Stopping DNS tunnel!")
@@ -194,6 +230,9 @@ module Dnscat2
           end
         end
 
+        ##
+        # Returns when the service stops (or never).
+        ##
         public
         def wait()
           if(!@nesser)

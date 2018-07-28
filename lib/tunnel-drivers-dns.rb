@@ -8,5 +8,5 @@
 #
 # Simply loads the main class.
 ##
-require 'dnscat2/tunnel_drivers/dns/driver_dns'
 
+require 'dnscat2/tunnel_drivers/dns/driver_dns'
