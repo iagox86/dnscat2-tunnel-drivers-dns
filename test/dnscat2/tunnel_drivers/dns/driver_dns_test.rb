@@ -440,6 +440,30 @@ module Dnscat2
             end
           end
         end
+
+        def test_nil_outgoing_message()
+          @mutex.synchronize() do
+            sink = MyTestSink.new(data: nil)
+
+            driver = Driver.new(
+              tags:     ['abc'],
+              domains:  ['test1.com'],
+              sink:     sink,
+              host:     '127.0.0.1',
+              port:     '16243',
+              encoder:  'hex',
+            )
+            driver.start()
+
+            begin
+              results = @resolv.getresources("41.test1.com", Resolv::DNS::Resource::IN::TXT).pop.data
+              assert_equal('', results)
+              assert_equal('A', sink.data_out)
+            ensure
+              driver.stop()
+            end
+          end
+        end
       end
     end
   end

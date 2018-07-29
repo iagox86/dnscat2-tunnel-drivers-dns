@@ -90,6 +90,9 @@ module Dnscat2
           # Exchange data with the sink
           outgoing_data = @sink.feed(data: incoming_data, max_length: builder.max_length)
 
+          # Handle a nil return cleanly
+          outgoing_data = outgoing_data || ''
+
           # Make sure the sink didn't mess with us
           if(outgoing_data.length > builder.max_length)
             raise(Exception, "The sink returned too much data: #{outgoing_data.length}, max_length was #{builder.max_length}")
