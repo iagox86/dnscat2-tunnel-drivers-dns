@@ -1,13 +1,13 @@
 # Encoding: ASCII-8BIT
 ##
-# dns-echo.rb
+# dns-discard.rb
 # Created July, 2018
 # By Ron Bowes
 #
 # See: LICENSE.md
 #
 # This is an example of how to use the dnscat2-tunneldrivers-dns library to
-# implement an echo-like program over DNS
+# implement a discard-like program over DNS
 #
 # This is entirely a toy program, designed to show off the protocol moreso than
 # anything else. Since this lets people download random files off your machine,
@@ -19,11 +19,10 @@ require 'trollop'
 require 'singlogger'
 
 VERSION = "0.0.0"
-MY_NAME = "tunnel-driver-dns-example-echo v#{VERSION}"
+MY_NAME = "tunnel-driver-dns-example-discard v#{VERSION}"
 
 DEFAULT_HOST = '0.0.0.0'
-DEFAULT_PORT = 53
-DEFAULT_ENCODER = 'hex'
+DEFAULT_PORT = 53533
 DEFAULT_TAGS = nil
 DEFAULT_DOMAINS = nil
 
@@ -35,14 +34,11 @@ OPTS = Trollop::options do
 
   opt :host,    "The ip address to listen on",                    :type => :string,  :default => DEFAULT_HOST
   opt :port,    "The port to listen on",                          :type => :integer, :default => DEFAULT_PORT
-  opt :encoder, "The encoder to use (hex|base32)",                :type => :string,  :default => DEFAULT_ENCODER
   opt :tags,    "The tags (prefixes) to use, comma-separated",    :type => :string,  :default => nil
   opt :domains, "The domains to use, comma-separated",            :type => :string,  :default => nil
 
-  opt :reverse,  "Reverse the echoed data",  :type => :boolean, :default => false
-  opt :upcase,   "Upcase the echoed data",   :type => :boolean, :default => false
-  opt :downcase, "Downcase the echoed data", :type => :boolean, :default => false
-  opt :rot13,    "ROT13 the echoed data",    :type => :boolean, :default => false
+  opt :response,   "How should we respond? Options: blank|nil|error|critical", :type => :string, :default => 'blank'
+  opt :error_text, "The text to use for the error or critical error",          :type => :string, :default => "Exception!!!"
 end
 
 SingLogger.set_level_from_string(level: OPTS[:debug])
@@ -55,33 +51,25 @@ end
 tags    = OPTS[:tags]    ? OPTS[:tags].split(/ *, */)    : nil
 domains = OPTS[:domains] ? OPTS[:domains].split(/ *, */) : nil
 
+if(['blank', 'nil', 'error', 'critical'].index(OPTS[:response]).nil?)
+  $stderr.puts("The response options are 'blank', 'nil', 'error', or 'critical'")
+  exit(1)
+end
+
 class Controller
   def feed(data:, max_length:)
     puts("IN: #{data}")
 
-    if(OPTS[:reverse])
-      data = data.reverse
+    case OPTS[:response]
+    when 'blank'
+      return ''
+    when 'nil'
+      return nil
+    when 'error'
+      raise Dnscat2::TunnelDrivers::DNS::Exception.new(OPTS[:error_text])
+    when 'critical'
+      raise Exception.new(OPTS[:error_text])
     end
-
-    if(OPTS[:upcase])
-      data = data.upcase()
-    end
-
-    if(OPTS[:downcase])
-      data = data.downcase()
-    end
-
-    if(OPTS[:upcase] && OPTS[:downcase])
-      data = data.chars.map() { |c| [true,false].sample ? c.upcase : c.downcase }.join() 
-    end
-
-    if(OPTS[:rot13])
-      data = data.chars.map() { |c| ('A'..'Z').include?(c) ? ((c.ord - 'A'.ord + 13) % 26 + 'A'.ord).chr : (('a'..'z').include?(c) ? ((c.ord - 'a'.ord + 13) % 26 + 'a'.ord).chr : c) }.join()
-    end
-
-    puts("OUT: #{data}")
-
-    return data
   end
 end
 
@@ -91,7 +79,8 @@ driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
   sink:    Controller.new(),
   host:    OPTS[:host],
   port:    OPTS[:port],
-  encoder: OPTS[:encoder],
+  encoder: 'hex',
 )
+
 driver.start()
 driver.wait()
