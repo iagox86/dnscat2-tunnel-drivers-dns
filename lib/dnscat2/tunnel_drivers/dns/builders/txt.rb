@@ -13,7 +13,6 @@ require 'thread'
 
 require 'dnscat2/tunnel_drivers/dns/builders/builder_helper'
 require 'dnscat2/tunnel_drivers/dns/builders/name_helper'
-require 'dnscat2/tunnel_drivers/dns/constants'
 require 'dnscat2/tunnel_drivers/dns/encoders/hex'
 require 'dnscat2/tunnel_drivers/dns/exception'
 

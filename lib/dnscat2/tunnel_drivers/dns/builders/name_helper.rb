@@ -11,7 +11,6 @@ require 'nesser'
 require 'singlogger'
 require 'thread'
 
-require 'dnscat2/tunnel_drivers/dns/constants'
 require 'dnscat2/tunnel_drivers/dns/encoders/base32'
 require 'dnscat2/tunnel_drivers/dns/encoders/hex'
 require 'dnscat2/tunnel_drivers/dns/exception'

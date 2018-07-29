@@ -20,7 +20,6 @@
 require 'nesser'
 require 'singlogger'
 require 'socket'
-require 'thread'
 
 require 'dnscat2/tunnel_drivers/dns/builders/a'
 require 'dnscat2/tunnel_drivers/dns/builders/aaaa'
@@ -34,12 +33,15 @@ require 'dnscat2/tunnel_drivers/dns/encoders/hex'
 
 require 'dnscat2/tunnel_drivers/dns/readers/standard'
 
-require 'dnscat2/tunnel_drivers/dns/constants'
 require 'dnscat2/tunnel_drivers/dns/exception'
 
 module Dnscat2
   module TunnelDrivers
     module DNS
+      ##
+      # The main class for this library - see README.md for full usage
+      # documentation!
+      ##
       class Driver
         # A simple map of all the "builders" we support
         BUILDERS = {
@@ -49,7 +51,7 @@ module Dnscat2
           ::Nesser::TYPE_MX    => Builders::MX,
           ::Nesser::TYPE_NS    => Builders::NS,
           ::Nesser::TYPE_TXT   => Builders::TXT,
-        }
+        }.freeze
 
         ##
         # Take a question, unpack it, pass it to the sink, get the data back,
@@ -61,17 +63,17 @@ module Dnscat2
           # question.type in TYPE_ANY situations
           question_type = question.type
           # Handle the ANY type
-          if(question.type == ::Nesser::TYPE_ANY)
+          if question.type == ::Nesser::TYPE_ANY
             # We need the key so we can build the return packet later
             # (We exclude AAAA because not all OSes support it (I'm looking at
             # you, Windows!)
-            question_type = BUILDERS.keys.select { |k| k != ::Nesser::TYPE_AAAA }.sample
+            question_type = BUILDERS.keys.reject { |k| k == ::Nesser::TYPE_AAAA }.sample
             builder = BUILDERS[question_type]
-            @l.debug("TunnelDrivers::DNS ANY request!")
+            @l.debug('TunnelDrivers::DNS ANY request!')
           else
             # Make sure the incoming message is a known type
             builder = BUILDERS[question.type]
-            if(builder.nil?)
+            if builder.nil?
               raise(Exception, "Received a DNS packet of unknown type: #{question.type}")
             end
           end
@@ -81,7 +83,7 @@ module Dnscat2
 
           # Parse the incoming message
           incoming_data, tag, domain = reader.read_data(question: question)
-          if(incoming_data.nil?)
+          if incoming_data.nil?
             @l.debug("TunnelDrivers::DNS question wasn't for us: #{question}")
             return nil
           end
@@ -94,7 +96,7 @@ module Dnscat2
           outgoing_data = @sink.feed(data: incoming_data, max_length: builder.max_length)
 
           # Make sure the sink didn't mess with us
-          if(outgoing_data.length > builder.max_length)
+          if outgoing_data.length > builder.max_length
             raise(Exception, "The sink returned too much data: #{outgoing_data.length}, max_length was #{builder.max_length}")
           end
 
@@ -102,7 +104,7 @@ module Dnscat2
           rrs = builder.build(data: outgoing_data)
 
           # Stuff each resource record into an Answer object
-          return rrs.map() do |rr|
+          return rrs.map do |rr|
             Nesser::Answer.new(
               name: question.name,
               type: question_type,

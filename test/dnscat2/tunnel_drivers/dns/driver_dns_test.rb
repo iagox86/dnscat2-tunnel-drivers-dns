@@ -30,7 +30,6 @@ module Dnscat2
 
         def setup()
           @mutex = Mutex.new()
-          SingLogger.set_level_from_string(level: 'debug') # TODO: Kill
           @resolv = ::Resolv::DNS.new(:nameserver_port => [['127.0.0.1', PORT]])
         end
 

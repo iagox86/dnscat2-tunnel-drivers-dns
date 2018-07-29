@@ -9,12 +9,12 @@
 
 require 'nesser'
 
-require 'dnscat2/tunnel_drivers/dns/constants'
-
 module Dnscat2
   module TunnelDrivers
     module DNS
       module Builders
+        MAX_RR_LENGTH = 253
+
         module BuilderHelper
           public
           def double_check_length(rrs:)
