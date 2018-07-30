@@ -19,6 +19,9 @@ Style/TrailingCommaInArrayLiteral:
 Metrics/PerceivedComplexity:
   Enabled: false
 
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
 Layout/EmptyLinesAroundAccessModifier:
   Enabled: false
 

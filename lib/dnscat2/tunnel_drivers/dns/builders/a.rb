@@ -68,7 +68,7 @@ module Dnscat2
               ip = [i] + ip.ljust(3, "\xFF").bytes
               i += 1
 
-              ::Kernel.format('%d.%d.%d.%d', ip[0], ip[1], ip[2], ip[3]) # rubocop:disable Style/FormatStringToken
+              ::Kernel.format('%d.%d.%d.%d', ip[0], ip[1], ip[2], ip[3])
             end
 
             return data.map do |ip|
