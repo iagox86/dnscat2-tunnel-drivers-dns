@@ -129,6 +129,32 @@ module Dnscat2
               encoder.build(data: 'A' * (encoder.max_length + 1))
             end
           end
+
+          def test_mx_with_no_data_just_tag
+            encoder = MX.new(
+              tag: 'aaa',
+              domain: nil,
+              max_subdomain_length: 63,
+              encoder: Encoders::Hex,
+            )
+
+            rr = encoder.build(data: '').pop
+
+            assert_equal('aaa', rr.name)
+          end
+
+          def test_mx_with_no_data_just_domain
+            encoder = MX.new(
+              tag: nil,
+              domain: 'test.com',
+              max_subdomain_length: 63,
+              encoder: Encoders::Hex,
+            )
+
+            rr = encoder.build(data: '').pop
+
+            assert_equal('test.com', rr.name)
+          end
         end
       end
     end
