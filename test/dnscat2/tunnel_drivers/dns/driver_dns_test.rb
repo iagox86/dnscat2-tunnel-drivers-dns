@@ -465,6 +465,22 @@ module Dnscat2
             end
           end
         end
+
+        def test_passthrough
+          tests = [
+            { test: 'a',       expected: { host: 'a', port: 53 } },
+            { test: 'a:a',     expected: { host: 'a', port: 53 } },
+            { test: 'a:53',    expected: { host: 'a', port: 53 } },
+            { test: 'a:53:53', expected: { host: 'a', port: 53 } },
+          ]
+
+          @mutex.synchronize do
+            tests.each do |test|
+              driver = Driver.new(tags: nil, domains: nil, sink: nil, host: '127.0.0.1', port: '16243', passthrough: test[:test])
+              assert_equal(test[:expected], driver.passthrough)
+            end
+          end
+        end
       end
     end
   end
