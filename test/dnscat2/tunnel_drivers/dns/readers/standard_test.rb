@@ -55,6 +55,13 @@ module Dnscat2
             assert_equal('test2.com', domain)
           end
 
+          def test_domain_periods_matter
+            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '414141.41test.com', type: 1, cls: 1))
+            assert_nil(data)
+            assert_nil(tag)
+            assert_nil(domain)
+          end
+
           def test_known_tag
             data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'abc.414141', type: 1, cls: 1))
             assert_equal('AAA', data)
@@ -67,6 +74,13 @@ module Dnscat2
             assert_equal('AAA', data)
             assert_equal('abc', tag)
             assert_equal(nil, domain)
+          end
+
+          def test_tag_periods_matter
+            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'abc41.414141', type: 1, cls: 1))
+            assert_nil(data)
+            assert_nil(tag)
+            assert_nil(domain)
           end
 
           def test_case_insensitive_domain
