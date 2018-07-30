@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # txt.rb
 # Created March, 2013
@@ -9,11 +10,9 @@
 
 require 'nesser'
 require 'singlogger'
-require 'thread'
 
 require 'dnscat2/tunnel_drivers/dns/builders/builder_helper'
 require 'dnscat2/tunnel_drivers/dns/builders/name_helper'
-require 'dnscat2/tunnel_drivers/dns/constants'
 require 'dnscat2/tunnel_drivers/dns/encoders/hex'
 require 'dnscat2/tunnel_drivers/dns/exception'
 
@@ -21,12 +20,15 @@ module Dnscat2
   module TunnelDrivers
     module DNS
       module Builders
+        ##
+        # Encode into a TXT record.
+        ##
         class TXT
           include BuilderHelper
 
           public
-          def initialize(tag:, domain:, encoder:Encoders::Hex)
-            @l = SingLogger.instance()
+          def initialize(tag:, domain:, encoder: Encoders::Hex)
+            @l = SingLogger.instance
             @tag = tag
             @domain = domain
             @encoder = encoder
@@ -37,7 +39,7 @@ module Dnscat2
           # appending tags and domain names.
           ##
           public
-          def max_length()
+          def max_length
             # -3 for the length prefixes (two bytes, then one byte)
             return ((MAX_RR_LENGTH - 3) / @encoder::RATIO).floor
           end
@@ -50,8 +52,8 @@ module Dnscat2
           public
           def build(data:)
             @l.debug("TunnelDrivers::DNS::Builders::TXT Encoding #{data.length} bytes of data")
-            if(data.length > max_length)
-              raise(Exception, "Tried to encode too much data!")
+            if data.length > max_length
+              raise(Exception, 'Tried to encode too much data!')
             end
 
             # Note: we still encode TXT records, because some OSes have trouble

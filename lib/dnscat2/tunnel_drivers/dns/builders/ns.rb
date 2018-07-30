@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # ns_builder.rb
 # Created July, 2018
@@ -9,25 +10,26 @@
 
 require 'nesser'
 require 'singlogger'
-require 'thread'
 
 require 'dnscat2/tunnel_drivers/dns/builders/builder_helper'
 require 'dnscat2/tunnel_drivers/dns/builders/name_helper'
-require 'dnscat2/tunnel_drivers/dns/constants'
 
 module Dnscat2
   module TunnelDrivers
     module DNS
       module Builders
+        ##
+        # Encode into an NS record.
+        ##
         class NS < NameHelper
           include BuilderHelper
 
           public
           def initialize(tag:, domain:, max_subdomain_length: 63, encoder: Encoders::Hex)
             # 2 extra bytes (for the length)
-            super(tag:tag, domain:domain, max_subdomain_length: max_subdomain_length, encoder: encoder, extra_bytes: 2)
+            super(tag: tag, domain: domain, max_subdomain_length: max_subdomain_length, encoder: encoder, extra_bytes: 2)
 
-            @l = SingLogger.instance()
+            @l = SingLogger.instance
           end
 
           ##

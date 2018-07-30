@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 require 'test_helper'
 
 require 'dnscat2/tunnel_drivers/dns/exception'
@@ -12,7 +13,7 @@ module Dnscat2
     module DNS
       module Builders
         class NameHelperTest < ::Test::Unit::TestCase
-          def test_max_length_different_tags()
+          def test_max_length_different_tags
             # Start with (253 - 4 periods - 1 NUL byte) / 2 characters/byte => 125
             assert_equal(124, NameHelper.new(tag: nil,      domain: nil, extra_bytes: 0).max_length)
 
@@ -40,7 +41,7 @@ module Dnscat2
             assert_equal(122, NameHelper.new(tag: nil, domain: 'aa',     extra_bytes: 0).max_length)
             assert_equal(122, NameHelper.new(tag: nil, domain: 'aaa',    extra_bytes: 0).max_length)
             assert_equal(121, NameHelper.new(tag: nil, domain: 'aaaa',   extra_bytes: 0).max_length)
-            assert_equal(121, NameHelper.new(tag: nil, domain: 'aaaaa' , extra_bytes: 0).max_length)
+            assert_equal(121, NameHelper.new(tag: nil, domain: 'aaaaa',  extra_bytes: 0).max_length)
             assert_equal(120, NameHelper.new(tag: nil, domain: 'aaaaaa', extra_bytes: 0).max_length)
 
             # Use 'extra bytes' the same way
@@ -54,7 +55,7 @@ module Dnscat2
             assert_equal(120, NameHelper.new(tag: nil, domain: nil, extra_bytes: 7).max_length)
           end
 
-          def test_max_length_different_segment_lengths()
+          def test_max_length_different_segment_lengths
             # The math to calculate these "correct" values is annoying.. it's 252 - ceil(252 / n + 1) / 2
             # The 252 is the max RR size (253) minus one for the NUL byte
             assert_equal(63,  NameHelper.new(tag: nil, domain: nil, max_subdomain_length: 1,  extra_bytes: 0).max_length)
@@ -120,10 +121,9 @@ module Dnscat2
             assert_equal(123,  NameHelper.new(tag: nil, domain: nil, max_subdomain_length: 61,  extra_bytes: 0).max_length)
             assert_equal(124,  NameHelper.new(tag: nil, domain: nil, max_subdomain_length: 62,  extra_bytes: 0).max_length)
             assert_equal(124,  NameHelper.new(tag: nil, domain: nil, max_subdomain_length: 63,  extra_bytes: 0).max_length)
-
           end
 
-          def test_encode()
+          def test_encode
             tests = [
               # Pretty normal test
               { tag: nil,   domain: nil,   data: 'AAAA', expected: '41414141',        max_subdomain_length: 63, encoder: Encoders::Hex },
@@ -158,11 +158,10 @@ module Dnscat2
             end
           end
 
-          def test_push_length_boundary()
+          def test_push_length_boundary
             # This will mostly fail on its own if it creates a message that's too long
             1.upto(63) do |subdomain_length|
               0.upto(250) do |domain_length|
-                #puts("subdomain #{subdomain_length}, domain #{domain_length}...")
                 # Hex
                 n = NameHelper.new(tag: nil, domain: 'A' * domain_length, max_subdomain_length: subdomain_length, extra_bytes: 0)
                 assert_not_nil(n.encode_name(data: ('a' * n.max_length)))
