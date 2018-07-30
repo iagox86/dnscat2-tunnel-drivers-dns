@@ -61,9 +61,14 @@ OPTS = Trollop.options do
     type:     :string,
     default:  nil
   )
+  opt(
+    :passthrough, 'Upstream DNS to forward unknown requests to',
+    type:         :string,
+    default:      nil
+  )
 
   opt(
-    binary,  'Send back binary data instead of just text',
+    :binary, 'Send back binary data instead of just text',
     type:    :boolean,
     default: false
   )
@@ -95,12 +100,13 @@ class Controller
 end
 
 driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
-  tags:    tags,
-  domains: domains,
-  sink:    Controller.new,
-  host:    OPTS[:host],
-  port:    OPTS[:port],
-  encoder: 'hex',
+  tags:        tags,
+  domains:     domains,
+  sink:        Controller.new,
+  host:        OPTS[:host],
+  port:        OPTS[:port],
+  encoder:     'hex',
+  passthrough: OPTS[:passthrough],
 )
 
 driver.start

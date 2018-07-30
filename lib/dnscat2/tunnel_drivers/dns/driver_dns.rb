@@ -139,12 +139,14 @@ module Dnscat2
           @l.debug("TunnelDrivers::DNS Question = #{question}")
 
           answers = _handle_question(question: question)
-          @l.debug("TunnelDrivers::DNS Answers = #{answers}")
+          @l.debug("TunnelDrivers::DNS Answers = #{answers || 'n/a'}")
           if !answers || answers.empty?
             if @passthrough
+              @l.debug("Sending transaction upstream to #{@passthrough[:host]}:#{@passthrough[:port]}")
               transaction.passthrough!(host: @passthrough[:host], port: @passthrough[:port])
             else
-              transaction.error!(Nesser::RCODE_NAME_ERROR) # TODO: Configurable error / passthrough?
+              @l.debug('Responding with NXDomain')
+              transaction.error!(Nesser::RCODE_NAME_ERROR)
             end
             return
           end
@@ -184,7 +186,7 @@ module Dnscat2
         public
         def initialize(tags:, domains:, sink:, host: '0.0.0.0', port: 53, encoder: 'hex', passthrough: nil)
           @l = SingLogger.instance
-          @l.debug("TunnelDrivers::DNS New instance! tags = #{tags}, domains = #{domains}, sink = #{sink}, host = #{host}, port = #{port}")
+          @l.debug("TunnelDrivers::DNS New instance! tags = #{tags}, domains = #{domains}, sink = #{sink}, host = #{host}, port = #{port}, encoder: #{encoder}, passthrough: #{passthrough}")
 
           @tags     = tags
           @domains  = domains
