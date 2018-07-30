@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # name_helper.rb
 # Created July, 2018
@@ -9,7 +10,6 @@
 
 require 'nesser'
 require 'singlogger'
-require 'thread'
 
 require 'dnscat2/tunnel_drivers/dns/encoders/base32'
 require 'dnscat2/tunnel_drivers/dns/encoders/hex'
@@ -19,11 +19,15 @@ module Dnscat2
   module TunnelDrivers
     module DNS
       module Builders
+        ##
+        # Help with encoding into name values (particularly with calculating the
+        # max length.
+        ##
         class NameHelper
           ENCODERS = [
             Encoders::Hex,
             Encoders::Base32,
-          ]
+          ].freeze
 
           ##
           # tag: The text that goes in front of the name
@@ -37,23 +41,23 @@ module Dnscat2
           #  `preference` field).
           public
           def initialize(tag:, domain:, max_subdomain_length: 63, encoder: Encoders::Hex, extra_bytes:)
-            @l = SingLogger.instance()
+            @l = SingLogger.instance
             @tag = tag == '' ? nil : tag
             @domain = domain == '' ? nil : domain
 
-            if(!tag.nil? && (tag.length > 252))
-              raise(Exception, "tag length is not sane")
+            if !tag.nil? && (tag.length > 252)
+              raise(Exception, 'Tag length is not sane')
             end
-            if(!domain.nil? && (domain.length > 252))
-              raise(Exception, "domain length is not sane")
+            if !domain.nil? && (domain.length > 252)
+              raise(Exception, 'Domain length is not sane')
             end
 
-            if(max_subdomain_length < 1 || max_subdomain_length > 63)
-              raise(Exception, "max_subdomain_length is not sane")
+            if max_subdomain_length < 1 || max_subdomain_length > 63
+              raise(Exception, 'max_subdomain_length is not sane')
             end
             @max_subdomain_length = max_subdomain_length
 
-            if(ENCODERS.index(encoder).nil?)
+            if ENCODERS.index(encoder).nil?
               raise(Exception, "Invalid encoder: #{encoder}")
             end
             @encoder = encoder
@@ -73,7 +77,7 @@ module Dnscat2
           # appending tags and domain names.
           ##
           public
-          def max_length()
+          def max_length
             # Start with the max resource record length
             max_total_length = MAX_RR_LENGTH
 
@@ -84,10 +88,10 @@ module Dnscat2
             max_total_length -= 1
 
             # Remove the length of the tag and/or domain from the packet (including their periods)
-            if(@tag)
+            if @tag
               max_total_length = max_total_length - @tag.length - 1
             end
-            if(@domain)
+            if @domain
               max_total_length = max_total_length - @domain.length - 1
             end
 
@@ -107,22 +111,22 @@ module Dnscat2
           def encode_name(data:)
             @l.debug("TunnelDrivers::DNS::NameHelper Encoding #{data.length} bytes of data")
 
-            if(data.length > max_length())
-              raise(Exception, "Tried to encode too much data")
+            if data.length > max_length
+              raise(Exception, 'Tried to encode too much data')
             end
 
-            name = @encoder.encode(data: data).chars.each_slice(@max_subdomain_length).map(&:join).join(".")
+            name = @encoder.encode(data: data).chars.each_slice(@max_subdomain_length).map(&:join).join('.')
 
             # Add the @tag or @domain
-            if(@tag)
+            if @tag
               name = "#{@tag}.#{name}"
             end
-            if(@domain)
+            if @domain
               name = "#{name}.#{@domain}"
             end
 
             # Always double check that we aren't too big for a DNS packet
-            if(name.length > MAX_RR_LENGTH)
+            if name.length > MAX_RR_LENGTH
               raise(Exception, "Tried to encode a name that's too long for the protocol (#{name.length} bytes)")
             end
 

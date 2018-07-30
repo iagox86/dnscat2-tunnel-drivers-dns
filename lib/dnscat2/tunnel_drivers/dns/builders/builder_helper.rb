@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # builder_helper.rb
 # Created March, 2013
@@ -15,15 +16,18 @@ module Dnscat2
       module Builders
         MAX_RR_LENGTH = 253
 
+        ##
+        # Helper mixin for writing builders.
+        ##
         module BuilderHelper
           public
           def double_check_length(rrs:)
             rrs.each do |rr|
-              packer = Nesser::Packer.new()
+              packer = Nesser::Packer.new
               rr.pack(packer)
 
-              if(packer.get().length > MAX_RR_LENGTH)
-                raise(Exception, "Tried to pack too much data into a name (packed #{packer.get().length} bytes, max is #{MAX_RR_LENGTH}! (This is an internal bug)")
+              if packer.get.length > MAX_RR_LENGTH
+                raise(Exception, "Tried to pack too much data into a name (packed #{packer.get.length} bytes, max is #{MAX_RR_LENGTH}! (This is an internal bug)")
               end
             end
           end

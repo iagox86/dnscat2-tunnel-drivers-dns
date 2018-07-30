@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # base32.rb
 # Created March, 2018
@@ -15,10 +16,13 @@ module Dnscat2
   module TunnelDrivers
     module DNS
       module Encoders
+        ##
+        # Converts data to or from Base32 encoding.
+        ##
         class Base32
-          NAME = "Base32 encoder"
+          NAME = 'Base32 encoder'.freeze
           RATIO = 1.6
-          DESCRIPTION = "Encodes to base32, which is letters and digits only"
+          DESCRIPTION = 'Encodes to base32, which is letters and digits only'.freeze
           CHARSET = /^[A-Z2-7]*$/
 
           public
@@ -32,14 +36,14 @@ module Dnscat2
             # Always force the data to be uppercase
             data = data.upcase
 
-            if(data !~ CHARSET)
+            if data !~ CHARSET
               raise(Exception, "Data isn't base32 encoded: #{data}")
             end
 
             # Fix the base32 string (uppercase, padded to a multiple of 8)
             # Even though the library we're using just strips off the '=' signs,
             # it's still a good idea to re-add them!
-            data = data + '=' * ((8 - (data.length % 8)) % 8)
+            data += '=' * ((8 - (data.length % 8)) % 8)
 
             begin
               return ::Base32.decode(data)

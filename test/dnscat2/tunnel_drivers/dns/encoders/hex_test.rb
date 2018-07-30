@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 require 'test_helper'
 
 require 'dnscat2/tunnel_drivers/dns/exception'
@@ -10,22 +11,22 @@ module Dnscat2
     module DNS
       module Encoders
         class HexTest < ::Test::Unit::TestCase
-          def test_characteristics()
-            assert_equal("Hex encoder", Hex::NAME)
+          def test_characteristics
+            assert_equal('Hex encoder', Hex::NAME)
             assert_equal(2.0, Hex::RATIO)
           end
 
-          def test_encode()
+          def test_encode
             assert_equal('4141', Hex.encode(data: 'AA'))
             assert_equal('', Hex.encode(data: ''))
           end
 
-          def test_decode()
+          def test_decode
             assert_equal('AA', Hex.decode(data: '4141'))
             assert_equal('', Hex.decode(data: ''))
           end
 
-          def test_decode_errors()
+          def test_decode_errors
             assert_raises(Exception) do
               Hex.decode(data: 'gg')
             end

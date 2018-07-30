@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # standard.rb
 # Created July, 2018
@@ -16,11 +17,15 @@ module Dnscat2
   module TunnelDrivers
     module DNS
       module Readers
+        ##
+        # Reads the data from a DNS packet's name. This is the normal (and only)
+        # reader so far.
+        ##
         class Standard
-          def initialize(tags:, domains:, encoder:Encoders::Hex)
-            @l        = SingLogger.instance()
+          def initialize(tags:, domains:, encoder: Encoders::Hex)
+            @l        = SingLogger.instance
             @tags     = tags || []
-            @domains  = domains  || []
+            @domains  = domains || []
             @encoder  = encoder
           end
 
@@ -35,7 +40,7 @@ module Dnscat2
           def _is_this_message_for_me(name:)
             # Check for domain first
             @domains.each do |d|
-              if(name.downcase.end_with?(d.downcase)) # TODO: This will fire inappropriately if the name is "blahDOMAIN.com", no period
+              if name.downcase.end_with?(d.downcase) # TODO: This will fire inappropriately if the name is "blahDOMAIN.com", no period
                 @l.debug("TunnelDrivers::DNS::Readers::Standard Message is for me, based on domain! #{name}")
                 return nil, d, name[0...-d.length]
               end
@@ -43,7 +48,7 @@ module Dnscat2
 
             # Check for tags second
             @tags.each do |p|
-              if(name.downcase.start_with?(p.downcase))
+              if name.downcase.start_with?(p.downcase)
                 @l.debug("TunnelDrivers::DNS::Readers::Standard Message is for me, based on tag! #{name}")
                 return p, nil, name[p.length..-1]
               end
@@ -60,14 +65,14 @@ module Dnscat2
             # Either tag or domain must be set
             tag, domain, name = _is_this_message_for_me(name: name)
 
-            if(!tag && !domain)
+            if !tag && !domain
               @l.debug("TunnelDrivers::DNS::Readers::Standard Received a message that didn't match our tag or domains: #{name}")
               return nil
             end
 
             # Decode the name into data
             @l.debug("TunnelDrivers::DNS::Readers::Standard Decoding #{name}...")
-            return @encoder.decode(data: name.gsub(/\./, '')), tag, domain
+            return @encoder.decode(data: name.delete('.')), tag, domain
           end
         end
       end

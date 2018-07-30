@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # driver_dns.rb
 # Created July, 2018
@@ -96,7 +97,7 @@ module Dnscat2
           outgoing_data = @sink.feed(data: incoming_data, max_length: builder.max_length)
 
           # Handle a nil return cleanly
-          outgoing_data = outgoing_data || ''
+          outgoing_data ||= ''
 
           # Make sure the sink didn't mess with us
           if outgoing_data.length > builder.max_length
@@ -124,35 +125,33 @@ module Dnscat2
         ##
         private
         def _handle_transaction(transaction:)
-          begin
-            @l.debug("TunnelDrivers::DNS Received a message!")
+          @l.debug('TunnelDrivers::DNS Received a message!')
 
-            request = transaction.request
-            if(request.questions.length != 1)
-              raise(Exception, "Incoming DNS request had a weird number of questions (expected: 1, it had: #{request.questions.length})")
-            end
-
-            question = request.questions[0]
-            @l.debug("TunnelDrivers::DNS Question = #{question}")
-
-            answers = _handle_question(question: question)
-            @l.debug("TunnelDrivers::DNS Answers = #{answers}")
-            if(!answers || answers.length == 0)
-              transaction.error!(Nesser::RCODE_NAME_ERROR) # TODO: Configurable error / passthrough?
-              return
-            end
-
-            transaction.answer!(answers)
-          rescue Exception => e # One of our exceptions
-            @l.error("TunnelDrivers::DNS An error occurred processing the DNS request: #{e}")
-            transaction.error!(Nesser::RCODE_SERVER_FAILURE)
-          rescue ::Exception => e # A BAD exception! We don't want these to ever happen!
-            @l.fatal("TunnelDrivers::DNS A serious error occurred processing the DNS request: #{e}")
-            e.backtrace.each do |bt|
-              @l.debug("#{bt}")
-            end
-            transaction.error!(Nesser::RCODE_SERVER_FAILURE)
+          request = transaction.request
+          if request.questions.length != 1
+            raise(Exception, "Incoming DNS request had a weird number of questions (expected: 1, it had: #{request.questions.length})")
           end
+
+          question = request.questions[0]
+          @l.debug("TunnelDrivers::DNS Question = #{question}")
+
+          answers = _handle_question(question: question)
+          @l.debug("TunnelDrivers::DNS Answers = #{answers}")
+          if !answers || answers.empty?
+            transaction.error!(Nesser::RCODE_NAME_ERROR) # TODO: Configurable error / passthrough?
+            return
+          end
+
+          transaction.answer!(answers)
+        rescue Dnscat2::TunnelDrivers::Exception => e # One of our exceptions
+          @l.error("TunnelDrivers::DNS An error occurred processing the DNS request: #{e}")
+          transaction.error!(Nesser::RCODE_SERVER_FAILURE)
+        rescue ::StandardError => e # A BAD exception! We don't want these to ever happen!
+          @l.fatal("TunnelDrivers::DNS A serious error occurred processing the DNS request: #{e}")
+          e.backtrace.each do |bt|
+            @l.debug(bt.to_s)
+          end
+          transaction.error!(Nesser::RCODE_SERVER_FAILURE)
         end
 
         ##
@@ -170,8 +169,8 @@ module Dnscat2
         #   `encoder:`)
         ##
         public
-        def initialize(tags:, domains:, sink:, host:"0.0.0.0", port:53, **settings)
-          @l = SingLogger.instance()
+        def initialize(tags:, domains:, sink:, host: '0.0.0.0', port: 53, **settings)
+          @l = SingLogger.instance
           @l.debug("TunnelDrivers::DNS New instance! tags = #{tags}, domains = #{domains}, sink = #{sink}, host = #{host}, port = #{port}")
 
           @tags     = tags
@@ -180,14 +179,14 @@ module Dnscat2
           @host     = host
           @port     = port
 
-          if(settings[:encoder] == 'base32')
-            @l.info("TunnelDrivers::DNS Setting encoder to Base32!")
+          if settings[:encoder] == 'base32'
+            @l.info('TunnelDrivers::DNS Setting encoder to Base32!')
             @encoder = Encoders::Base32
           else
             @encoder = Encoders::Hex
           end
 
-          @mutex = Mutex.new()
+          @mutex = Mutex.new
         end
 
         ##
@@ -197,14 +196,14 @@ module Dnscat2
         # If no socket is passed in, a new UDPSocket is created.
         ##
         public
-        def start(s:nil, auto_close_socket:true)
-          @l.info("TunnelDrivers::DNS Starting DNS tunnel driver!")
-          @mutex.synchronize() do
-            if(!@nesser.nil?)
-              raise(Exception, "DNS tunnel is already running")
+        def start(s: nil, auto_close_socket: true)
+          @l.info('TunnelDrivers::DNS Starting DNS tunnel driver!')
+          @mutex.synchronize do
+            unless @nesser.nil?
+              raise(Exception, 'DNS tunnel is already running')
             end
 
-            @s = ::UDPSocket.new()
+            @s = s || ::UDPSocket.new
             @auto_close_socket = auto_close_socket
             @nesser = Nesser::Nesser.new(s: @s, logger: @l, host: @host, port: @port) do |transaction|
               _handle_transaction(transaction: transaction)
@@ -220,17 +219,17 @@ module Dnscat2
         # `start()` was called.
         ##
         public
-        def stop()
-          @l.info("TunnelDrivers::DNS Stopping DNS tunnel!")
-          @mutex.synchronize() do
-            if(@nesser.nil?)
+        def stop
+          @l.info('TunnelDrivers::DNS Stopping DNS tunnel!')
+          @mutex.synchronize do
+            if @nesser.nil?
               raise(Exception, "DNS tunnel isn't running!")
             end
 
-            @nesser.stop()
+            @nesser.stop
             @nesser = nil
-            if(@auto_close_socket)
-              @s.close()
+            if @auto_close_socket
+              @s.close
             end
           end
         end
@@ -239,11 +238,11 @@ module Dnscat2
         # Returns when the service stops (or never).
         ##
         public
-        def wait()
-          if(!@nesser)
+        def wait
+          unless @nesser
             return
           end
-          @nesser.wait()
+          @nesser.wait
         end
       end
     end

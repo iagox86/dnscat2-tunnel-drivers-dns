@@ -1,4 +1,5 @@
 # Encoding: ASCII-8BIT
+
 ##
 # dnscat2-tunneldrivers-dns.rb
 # Created July, 2018

@@ -7,7 +7,16 @@ Metrics/ClassLength:
 Metrics/MethodLength:
   Enabled: false
 
+Metrics/BlockLength:
+  Enabled: false
+
 Style/TrailingCommaInHashLiteral:
+  Enabled: false
+
+Style/TrailingCommaInArrayLiteral:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
   Enabled: false
 
 Layout/EmptyLinesAroundAccessModifier:
@@ -17,4 +26,28 @@ Metrics/AbcSize:
   Enabled: false
 
 Style/TrailingCommaInArguments:
+  Enabled: false
+
+Style/RedundantReturn:
+  Enabled: false
+
+Lint/UselessAccessModifier:
+  Enabled: false
+
+Lint/ShadowedException:
+  Enabled: false
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Naming/UncommunicativeMethodParamName:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+Style/FormatStringToken:
+  Enabled: false
+
+Style/WordArray:
   Enabled: false
