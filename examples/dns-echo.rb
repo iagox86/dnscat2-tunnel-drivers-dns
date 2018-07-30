@@ -62,6 +62,11 @@ OPTS = Trollop.options do
     type:     :string,
     default:  nil
   )
+  opt(
+    :passthrough, 'Upstream DNS to forward unknown requests to',
+    type:         :string,
+    default:      nil
+  )
 
   opt(
     :reverse,  'Reverse the echoed data',
@@ -128,12 +133,13 @@ class Controller
 end
 
 driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
-  tags:    tags,
-  domains: domains,
-  sink:    Controller.new,
-  host:    OPTS[:host],
-  port:    OPTS[:port],
-  encoder: OPTS[:encoder],
+  tags:        tags,
+  domains:     domains,
+  sink:        Controller.new,
+  host:        OPTS[:host],
+  port:        OPTS[:port],
+  encoder:     OPTS[:encoder],
+  passthrough: OPTS[:passthrough],
 )
 driver.start
 driver.wait

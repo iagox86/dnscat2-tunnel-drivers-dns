@@ -119,10 +119,12 @@ module Dnscat2
 
             # Add the @tag or @domain
             if @tag
-              name = "#{@tag}.#{name}"
+              # If there's no name, return simply the tag
+              name = name.empty? ? @tag : "#{@tag}.#{name}"
             end
             if @domain
-              name = "#{name}.#{@domain}"
+              # Likewise domain
+              name = name.empty? ? @domain : "#{name}.#{@domain}"
             end
 
             # Always double check that we aren't too big for a DNS packet

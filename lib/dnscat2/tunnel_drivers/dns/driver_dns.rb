@@ -54,6 +54,9 @@ module Dnscat2
           ::Nesser::TYPE_TXT   => Builders::TXT,
         }.freeze
 
+        # Just for testing, probably
+        attr_reader :passthrough
+
         ##
         # Take a question, unpack it, pass it to the sink, get the data back,
         # and encode the message into a series of resource records.
@@ -136,17 +139,28 @@ module Dnscat2
           @l.debug("TunnelDrivers::DNS Question = #{question}")
 
           answers = _handle_question(question: question)
-          @l.debug("TunnelDrivers::DNS Answers = #{answers}")
+          @l.debug("TunnelDrivers::DNS Answers = #{answers || 'n/a'}")
           if !answers || answers.empty?
-            transaction.error!(Nesser::RCODE_NAME_ERROR) # TODO: Configurable error / passthrough?
+            if @passthrough
+              @l.debug("Sending transaction upstream to #{@passthrough[:host]}:#{@passthrough[:port]}")
+              transaction.passthrough!(host: @passthrough[:host], port: @passthrough[:port])
+            else
+              @l.debug('Responding with NXDomain')
+              transaction.error!(Nesser::RCODE_NAME_ERROR)
+            end
             return
           end
 
           transaction.answer!(answers)
-        rescue Dnscat2::TunnelDrivers::Exception => e # One of our exceptions
+
+        # A minor exception
+        rescue Dnscat2::TunnelDrivers::Exception => e
           @l.error("TunnelDrivers::DNS An error occurred processing the DNS request: #{e}")
           transaction.error!(Nesser::RCODE_SERVER_FAILURE)
-        rescue ::StandardError => e # A BAD exception! We don't want these to ever happen!
+
+        # A BAD exception! We don't want these to ever happen! We still want to
+        # catch this, though, because we NEVER want to kill the service.
+        rescue ::Exception => e # rubocop:disable Lint/RescueException
           @l.fatal("TunnelDrivers::DNS A serious error occurred processing the DNS request: #{e}")
           e.backtrace.each do |bt|
             @l.debug(bt.to_s)
@@ -165,13 +179,14 @@ module Dnscat2
         #   see README.md
         # host: The ip address to listen on
         # port: The port to listen on
-        # settings: Any other settings that we decide to define (such as
-        #   `encoder:`)
+        # encoder: Encode to use ('hex' or 'base32')
+        # passthrough: Set to an `ip` or `ip`:`port` to do passthrough for
+        #   unknown domain names
         ##
         public
-        def initialize(tags:, domains:, sink:, host: '0.0.0.0', port: 53, **settings)
+        def initialize(tags:, domains:, sink:, host: '0.0.0.0', port: 53, encoder: 'hex', passthrough: nil)
           @l = SingLogger.instance
-          @l.debug("TunnelDrivers::DNS New instance! tags = #{tags}, domains = #{domains}, sink = #{sink}, host = #{host}, port = #{port}")
+          @l.debug("TunnelDrivers::DNS New instance! tags = #{tags}, domains = #{domains}, sink = #{sink}, host = #{host}, port = #{port}, encoder: #{encoder}, passthrough: #{passthrough}")
 
           @tags     = tags
           @domains  = domains
@@ -179,11 +194,21 @@ module Dnscat2
           @host     = host
           @port     = port
 
-          if settings[:encoder] == 'base32'
+          if encoder == 'base32'
             @l.info('TunnelDrivers::DNS Setting encoder to Base32!')
             @encoder = Encoders::Base32
           else
             @encoder = Encoders::Hex
+          end
+
+          if passthrough
+            passthrough = passthrough.split(/:/, 2)
+            port = passthrough[1].to_i
+
+            @passthrough = {
+              host: passthrough[0],
+              port: port.zero? ? 53 : port,
+            }
           end
 
           @mutex = Mutex.new
@@ -212,7 +237,7 @@ module Dnscat2
         end
 
         ##
-        # Stop the driver. If thi sis called while it's already stopped,
+        # Stop the driver. If this is called while it's already stopped,
         # `Exception` is thrown.
         #
         # Also closes the socket if `auto_close_socket` was `true` when

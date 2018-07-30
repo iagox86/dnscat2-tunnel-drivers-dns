@@ -61,6 +61,11 @@ OPTS = Trollop.options do
     type:     :string,
     default:  nil
   )
+  opt(
+    :passthrough, 'Upstream DNS to forward unknown requests to',
+    type:         :string,
+    default:      nil
+  )
 
   opt(
     :response, 'How should we respond? Options: blank|nil|error|critical',
@@ -114,6 +119,7 @@ driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
   host:    OPTS[:host],
   port:    OPTS[:port],
   encoder: 'hex',
+  passthrough: OPTS[:passthrough],
 )
 
 driver.start

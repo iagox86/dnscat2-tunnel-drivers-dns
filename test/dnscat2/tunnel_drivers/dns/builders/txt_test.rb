@@ -45,6 +45,18 @@ module Dnscat2
 
             assert_equal('ifqucykbmfawc', rr.data)
           end
+
+          def test_txt_with_no_data_just_tag
+            encoder = TXT.new(
+              tag: 'aaa',
+              domain: nil,
+              encoder: Encoders::Hex,
+            )
+
+            rr = encoder.build(data: '').pop
+
+            assert_equal('', rr.data)
+          end
         end
       end
     end
