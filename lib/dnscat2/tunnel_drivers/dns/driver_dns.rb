@@ -83,21 +83,41 @@ module Dnscat2
           end
 
           # We only have one reader right now, so use it
-          reader = Readers::Standard.new(tags: @tags, domains: @domains, encoder: @encoder)
+          reader = Readers::Standard.new
 
-          # Parse the incoming message
-          incoming_data, tag, domain = reader.read_data(question: question)
+          # Try and parse via domain(s)
+          incoming_data = nil
+          extra = nil
+          @domains.each do |d|
+            incoming_data = reader.try_domain(name: question.name, domain: d[:domain], encoder: d[:encoder])
+            if incoming_data
+              extra = d
+              break
+            end
+          end
+
+          # If the domain thing didn't work out, try to find a tag
           if incoming_data.nil?
-            @l.debug("TunnelDrivers::DNS question wasn't for us: #{question}")
+            @tags.each do |t|
+              incoming_data = reader.try_tag(name: question.name, tag: t[:tag], encoder: t[:encoder])
+              if incoming_data
+                extra = t
+                break
+              end
+            end
+          end
+
+          if incoming_data.nil?
+            @l.debug("TunnelDrivers::DNS question probably wasn't for us!")
             return nil
           end
 
           # Initialize a builder with the infos we got (we need this now so we
           # can determine the maximum length)
-          builder = builder.new(tag: tag, domain: domain, encoder: @encoder)
+          builder = builder.new(tag: extra[:tag], domain: extra[:domain], encoder: extra[:encoder])
 
           # Exchange data with the sink
-          outgoing_data = @sink.feed(data: incoming_data, max_length: builder.max_length)
+          outgoing_data = extra[:sink].feed(data: incoming_data, max_length: builder.max_length)
 
           # Handle a nil return cleanly
           outgoing_data ||= ''
@@ -154,7 +174,7 @@ module Dnscat2
           transaction.answer!(answers)
 
         # A minor exception
-        rescue Dnscat2::TunnelDrivers::Exception => e
+        rescue Exception => e
           @l.error("TunnelDrivers::DNS An error occurred processing the DNS request: #{e}")
           transaction.error!(Nesser::RCODE_SERVER_FAILURE)
 
@@ -171,36 +191,21 @@ module Dnscat2
         ##
         # Create an instance of the tunnel driver.
         #
-        # tags: An array of tags (prefixes) that we are listening for (or nil)
-        # domains: An array of domains (postfixes) that we are listening for (or
-        #   nil)
-        # sink: The sink to send data to and get it from (simply a class that
-        #   has one method: `feed(data:, max_length:)`. For more information,
-        #   see README.md
         # host: The ip address to listen on
         # port: The port to listen on
-        # encoder: Encode to use ('hex' or 'base32')
         # passthrough: Set to an `ip` or `ip`:`port` to do passthrough for
         #   unknown domain names
         ##
         public
-        def initialize(tags:, domains:, sink:, host: '0.0.0.0', port: 53, encoder: 'hex', passthrough: nil)
+        def initialize(host: '0.0.0.0', port: 53, passthrough: nil)
           @l = SingLogger.instance
-          @l.debug("TunnelDrivers::DNS New instance! tags = #{tags}, domains = #{domains}, sink = #{sink}, host = #{host}, port = #{port}, encoder: #{encoder}, passthrough: #{passthrough}")
+          @l.debug("TunnelDrivers::DNS New instance! host = #{host}, port = #{port}, passthrough: #{passthrough}")
 
-          @tags     = tags
-          @domains  = domains
-          @sink     = sink
           @host     = host
           @port     = port
 
-          if encoder == 'base32'
-            @l.info('TunnelDrivers::DNS Setting encoder to Base32!')
-            @encoder = Encoders::Base32
-          else
-            @encoder = Encoders::Hex
-          end
-
+          # Convert passthrough from `host` or `host:port` to the two separate
+          # values
           if passthrough
             passthrough = passthrough.split(/:/, 2)
             port = passthrough[1].to_i
@@ -211,51 +216,77 @@ module Dnscat2
             }
           end
 
-          @mutex = Mutex.new
+          # Create the socket and start the listener
+          @s = UDPSocket.new
+          @nesser = Nesser::Nesser.new(s: @s, logger: @l, host: @host, port: @port) do |transaction|
+            _handle_transaction(transaction: transaction)
+          end
+
+          # Create tags and domains lists
+          @tags    = []
+          @domains = []
         end
 
         ##
-        # Start the driver. If this is called while it's already started,
-        # `Exception` is thrown.
-        #
-        # If no socket is passed in, a new UDPSocket is created.
+        # Kill the listener thread.
         ##
         public
-        def start(s: nil, auto_close_socket: true)
-          @l.info('TunnelDrivers::DNS Starting DNS tunnel driver!')
-          @mutex.synchronize do
-            unless @nesser.nil?
-              raise(Exception, 'DNS tunnel is already running')
-            end
+        def kill
+          if @nesser.nil?
+            raise(Exception, "DNS tunnel isn't running!")
+          end
 
-            @s = s || ::UDPSocket.new
-            @auto_close_socket = auto_close_socket
-            @nesser = Nesser::Nesser.new(s: @s, logger: @l, host: @host, port: @port) do |transaction|
-              _handle_transaction(transaction: transaction)
+          @nesser.stop
+          @nesser = nil
+          @s.close
+        end
+
+        public
+        def add_domain(domain:, sink:, encoder:)
+          # Sanity check the domain
+          @domains.map { |d| d[:domain] }.each do |d|
+            if d.end_with?('.' + domain) || domain.end_with?('.' + d)
+              raise(Exception, "Domain conflicts with a domain that's already enabled! #{domain} :: #{d}")
             end
+          end
+
+          @domains << {
+            domain:  domain,
+            sink:    sink,
+            encoder: encoder,
+          }
+        end
+
+        public
+        def remove_domain(domain:)
+          @domains = @domains.reject do |d|
+            d[:domain] == domain
           end
         end
 
         ##
-        # Stop the driver. If this is called while it's already stopped,
-        # `Exception` is thrown.
-        #
-        # Also closes the socket if `auto_close_socket` was `true` when
-        # `start()` was called.
+        # Add a tag-based listener.
         ##
         public
-        def stop
-          @l.info('TunnelDrivers::DNS Stopping DNS tunnel!')
-          @mutex.synchronize do
-            if @nesser.nil?
-              raise(Exception, "DNS tunnel isn't running!")
+        def add_tag(tag:, sink:, encoder:)
+          # Sanity check the tag
+          @tags.map { |t| t[:tag] }.each do |t|
+            if t.start_with?(tag + '.') || tag.start_with?(t + '.')
+              raise(Exception, "Tag conflicts with a tag that's already enabled! #{tag} :: #{t}")
             end
+          end
 
-            @nesser.stop
-            @nesser = nil
-            if @auto_close_socket
-              @s.close
-            end
+          @tags << {
+            tag:     tag,
+            sink:    sink,
+            encoder: encoder,
+          }
+        end
+
+        public
+        def remove_tag(tag:)
+          @tags = @tags.reject do |t|
+            t[:tag] == tag
           end
         end
 
