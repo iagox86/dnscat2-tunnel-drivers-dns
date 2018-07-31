@@ -100,7 +100,7 @@ module Dnscat2
               driver.add_sink(
                 domain: 'test.com',
                 sink:    sink,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               result = @resolv.getaddresses('41414141.test.com').map(&:to_s).sort
@@ -121,7 +121,7 @@ module Dnscat2
               driver.add_sink(
                 tag:    'abc',
                 sink:    sink,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               result = @resolv.getaddresses('abc.41414141').map(&:to_s).sort
@@ -145,25 +145,25 @@ module Dnscat2
               driver.add_sink(
                 domain: 'test.com',
                 sink:    sink1,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               driver.add_sink(
                 domain: '123test.com',
                 sink:    sink2,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               driver.add_sink(
                 tag:    'abc',
                 sink:    sink3,
-                encoder: Encoders::Base32,
+                encoder: 'base32',
               )
 
               driver.add_sink(
                 tag:    'abc123',
                 sink:    sink4,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               result1 = @resolv.getaddresses('31313131.test.com').map(&:to_s).sort
@@ -196,7 +196,7 @@ module Dnscat2
                 domains: ['test.com', 'test2.com'],
                 tags:    ['abc',      '123'],
                 sink:    sink,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               result = @resolv.getaddresses('41414141.test.com').map(&:to_s).sort
@@ -236,7 +236,7 @@ module Dnscat2
 
               # Add all the tests as tags
               tests.each do |t|
-                driver.add_sink(tag: t[:name], sink: t[:sink], encoder: Encoders::Hex)
+                driver.add_sink(tag: t[:name], sink: t[:sink], encoder: 'hex')
               end
 
               # Try them all
@@ -261,7 +261,7 @@ module Dnscat2
             driver.add_sink(
               domain:  'test.com',
               sink:    sink,
-              encoder: Encoders::Hex,
+              encoder: 'hex',
             )
 
             begin
@@ -300,31 +300,31 @@ module Dnscat2
                 port:     '16243',
               )
 
-              driver.add_sink(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
-              driver.add_sink(tag: 'abc.123', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'test.com', sink: sink, encoder: 'hex')
+              driver.add_sink(tag: 'abc.123', sink: sink, encoder: 'hex')
 
               # Make sure subdomains of test are caught
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_sink(domain: 'sub.test.com', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(domain: 'sub.test.com', sink: sink, encoder: 'hex')
               end
               # ...and superdomains
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_sink(domain: 'com', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(domain: 'com', sink: sink, encoder: 'hex')
               end
 
               # Make sure we CAN add domains that are part of the strings
-              driver.add_sink(domain: '123test.com', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: '123test.com', sink: sink, encoder: 'hex')
 
               # Same with tags
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_sink(tag: 'abc', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(tag: 'abc', sink: sink, encoder: 'hex')
               end
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_sink(tag: 'abc.123.super', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(tag: 'abc.123.super', sink: sink, encoder: 'hex')
               end
 
               # Make sure we CAN add tags that are part of the strings
-              driver.add_sink(domain: 'abc.123hi', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'abc.123hi', sink: sink, encoder: 'hex')
             ensure
               driver.kill
             end
@@ -337,18 +337,18 @@ module Dnscat2
               driver = Driver.new(host: '127.0.0.1', port: PORT)
               sink = MyTestSink.new(data: '1')
 
-              driver.add_sink(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'test.com', sink: sink, encoder: 'hex')
               assert_equal(['0.1.49.255'], @resolv.getaddresses('31313131.test.com').map(&:to_s).sort)
               driver.remove_domain(domain: 'test.com')
               assert_equal([], @resolv.getaddresses('31313131.test.com').map(&:to_s).sort)
-              driver.add_sink(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'test.com', sink: sink, encoder: 'hex')
               assert_equal(['0.1.49.255'], @resolv.getaddresses('31313131.test.com').map(&:to_s).sort)
 
-              driver.add_sink(tag: 'abc', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(tag: 'abc', sink: sink, encoder: 'hex')
               assert_equal(['0.1.49.255'], @resolv.getaddresses('abc.31313131').map(&:to_s).sort)
               driver.remove_tag(tag: 'abc')
               assert_equal([], @resolv.getaddresses('abc.31313131').map(&:to_s).sort)
-              driver.add_sink(tag: 'abc', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(tag: 'abc', sink: sink, encoder: 'hex')
               assert_equal(['0.1.49.255'], @resolv.getaddresses('abc.31313131').map(&:to_s).sort)
             ensure
               driver.kill
@@ -368,7 +368,7 @@ module Dnscat2
               driver.add_sink(
                 domain:  'test.com',
                 sink:    sink,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               result = @resolv.getresources('414243444546474849.test.com', Resolv::DNS::Resource::IN::SOA).pop
@@ -434,13 +434,13 @@ module Dnscat2
               driver.add_sink(
                 domain: 'test.com',
                 sink:    sink1,
-                encoder: Encoders::Hex,
+                encoder: 'hex',
               )
 
               driver.add_sink(
                 tag:    'abc',
                 sink:    sink2,
-                encoder: Encoders::Base32,
+                encoder: 'base32',
               )
 
               result1 = @resolv.getaddresses('test.com').map(&:to_s).sort
@@ -469,7 +469,7 @@ module Dnscat2
             driver.add_sink(
               domain:  'test.com',
               sink:    sink,
-              encoder: Encoders::Hex,
+              encoder: 'hex',
             )
 
             begin
@@ -493,7 +493,7 @@ module Dnscat2
             driver.add_sink(
               domain:  'test.com',
               sink:    sink,
-              encoder: Encoders::Base32,
+              encoder: 'base32',
             )
 
             begin
@@ -517,7 +517,7 @@ module Dnscat2
             driver.add_sink(
               domain:  'test.com',
               sink:    sink,
-              encoder: Encoders::Hex,
+              encoder: 'hex',
             )
 
             begin

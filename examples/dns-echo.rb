@@ -96,8 +96,8 @@ if !OPTS[:tags] && !OPTS[:domains]
   raise(ArgumentException, 'You need to specify either a tag or a domain!')
 end
 
-tags    = OPTS[:tags]    ? OPTS[:tags].split(/ *, */)    : nil
-domains = OPTS[:domains] ? OPTS[:domains].split(/ *, */) : nil
+tags    = OPTS[:tags]    ? OPTS[:tags].split(/ *, */)    : []
+domains = OPTS[:domains] ? OPTS[:domains].split(/ *, */) : []
 
 ##
 # A simple controller to handle incoming messages.
@@ -133,13 +133,14 @@ class Controller
 end
 
 driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
-  tags:        tags,
-  domains:     domains,
-  sink:        Controller.new,
   host:        OPTS[:host],
   port:        OPTS[:port],
-  encoder:     OPTS[:encoder],
   passthrough: OPTS[:passthrough],
 )
-driver.start
+driver.add_sinks(
+  domains: domains,
+  tags:    tags,
+  sink:    Controller.new,
+  encoder: 'hex',
+)
 driver.wait

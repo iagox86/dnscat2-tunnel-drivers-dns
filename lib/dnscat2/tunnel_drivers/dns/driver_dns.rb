@@ -22,6 +22,8 @@ require 'nesser'
 require 'singlogger'
 require 'socket'
 
+require 'dnscat2/tunnel_drivers/dns/readers/standard'
+
 require 'dnscat2/tunnel_drivers/dns/builders/a'
 require 'dnscat2/tunnel_drivers/dns/builders/aaaa'
 require 'dnscat2/tunnel_drivers/dns/builders/cname'
@@ -29,10 +31,7 @@ require 'dnscat2/tunnel_drivers/dns/builders/mx'
 require 'dnscat2/tunnel_drivers/dns/builders/ns'
 require 'dnscat2/tunnel_drivers/dns/builders/txt'
 
-require 'dnscat2/tunnel_drivers/dns/encoders/base32'
-require 'dnscat2/tunnel_drivers/dns/encoders/hex'
-
-require 'dnscat2/tunnel_drivers/dns/readers/standard'
+require 'dnscat2/tunnel_drivers/dns/encoders/encoders'
 
 require 'dnscat2/tunnel_drivers/dns/exception'
 
@@ -253,7 +252,7 @@ module Dnscat2
           @domains << {
             domain:  domain,
             sink:    sink,
-            encoder: encoder,
+            encoder: Encoders.get_by_name(encoder),
           }
         end
 
@@ -279,7 +278,7 @@ module Dnscat2
           @tags << {
             tag:     tag,
             sink:    sink,
-            encoder: encoder,
+            encoder: Encoders.get_by_name(encoder),
           }
         end
 
