@@ -291,6 +291,30 @@ module Dnscat2
         end
 
         ##
+        # Convenience function to add a domain, a tag, or both at the same time
+        ##
+        public
+        def add_sink(domain: nil, tag: nil, **args)
+          if domain
+            add_domain(domain: domain, **args)
+          end
+
+          if tag # rubocop:disable Style/GuardClause
+            add_tag(tag: tag, **args)
+          end
+        end
+
+        ##
+        # Convenience function to add multiple domains, tags, or both at the
+        # same time
+        ##
+        public
+        def add_sinks(domains: [], tags: [], **args)
+          domains.each { |d| add_domain(domain: d, **args) }
+          tags.each { |t| add_tag(tag: t, **args) }
+        end
+
+        ##
         # Returns when the service stops (or never).
         ##
         public

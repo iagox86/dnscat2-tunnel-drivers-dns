@@ -97,7 +97,7 @@ module Dnscat2
               driver = Driver.new(host: '127.0.0.1', port: PORT)
               sink = MyTestSink.new(data: 'B')
 
-              driver.add_domain(
+              driver.add_sink(
                 domain: 'test.com',
                 sink:    sink,
                 encoder: Encoders::Hex,
@@ -118,7 +118,7 @@ module Dnscat2
               driver = Driver.new(host: '127.0.0.1', port: PORT)
               sink = MyTestSink.new(data: 'BBB')
 
-              driver.add_tag(
+              driver.add_sink(
                 tag:    'abc',
                 sink:    sink,
                 encoder: Encoders::Hex,
@@ -142,25 +142,25 @@ module Dnscat2
               sink3 = MyTestSink.new(data: '3')
               sink4 = MyTestSink.new(data: '4')
 
-              driver.add_domain(
+              driver.add_sink(
                 domain: 'test.com',
                 sink:    sink1,
                 encoder: Encoders::Hex,
               )
 
-              driver.add_domain(
+              driver.add_sink(
                 domain: '123test.com',
                 sink:    sink2,
                 encoder: Encoders::Hex,
               )
 
-              driver.add_tag(
+              driver.add_sink(
                 tag:    'abc',
                 sink:    sink3,
                 encoder: Encoders::Base32,
               )
 
-              driver.add_tag(
+              driver.add_sink(
                 tag:    'abc123',
                 sink:    sink4,
                 encoder: Encoders::Hex,
@@ -186,6 +186,40 @@ module Dnscat2
           end
         end
 
+        def test_multiple_same_sinks
+          @mutex.synchronize do
+            begin
+              driver = Driver.new(host: '127.0.0.1', port: PORT)
+              sink = MyTestSink.new(data: 'A')
+
+              driver.add_sinks(
+                domains: ['test.com', 'test2.com'],
+                tags:    ['abc',      '123'],
+                sink:    sink,
+                encoder: Encoders::Hex,
+              )
+
+              result = @resolv.getaddresses('41414141.test.com').map(&:to_s).sort
+              assert_equal(['0.1.65.255'], result)
+              assert_equal('AAAA', sink.data_out)
+
+              result = @resolv.getaddresses('41414141.test2.com').map(&:to_s).sort
+              assert_equal(['0.1.65.255'], result)
+              assert_equal('AAAA', sink.data_out)
+
+              result = @resolv.getaddresses('abc.41414141').map(&:to_s).sort
+              assert_equal(['0.1.65.255'], result)
+              assert_equal('AAAA', sink.data_out)
+
+              result = @resolv.getaddresses('123.41414141').map(&:to_s).sort
+              assert_equal(['0.1.65.255'], result)
+              assert_equal('AAAA', sink.data_out)
+            ensure
+              driver.kill
+            end
+          end
+        end
+
         def test_other_record_types
           @mutex.synchronize do
             begin
@@ -202,7 +236,7 @@ module Dnscat2
 
               # Add all the tests as tags
               tests.each do |t|
-                driver.add_tag(tag: t[:name], sink: t[:sink], encoder: Encoders::Hex)
+                driver.add_sink(tag: t[:name], sink: t[:sink], encoder: Encoders::Hex)
               end
 
               # Try them all
@@ -224,7 +258,7 @@ module Dnscat2
               host:     '127.0.0.1',
               port:     '16243',
             )
-            driver.add_domain(
+            driver.add_sink(
               domain:  'test.com',
               sink:    sink,
               encoder: Encoders::Hex,
@@ -266,31 +300,31 @@ module Dnscat2
                 port:     '16243',
               )
 
-              driver.add_domain(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
-              driver.add_tag(tag: 'abc.123', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(tag: 'abc.123', sink: sink, encoder: Encoders::Hex)
 
               # Make sure subdomains of test are caught
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_domain(domain: 'sub.test.com', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(domain: 'sub.test.com', sink: sink, encoder: Encoders::Hex)
               end
               # ...and superdomains
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_domain(domain: 'com', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(domain: 'com', sink: sink, encoder: Encoders::Hex)
               end
 
               # Make sure we CAN add domains that are part of the strings
-              driver.add_domain(domain: '123test.com', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: '123test.com', sink: sink, encoder: Encoders::Hex)
 
               # Same with tags
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_tag(tag: 'abc', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(tag: 'abc', sink: sink, encoder: Encoders::Hex)
               end
               assert_raises(Dnscat2::TunnelDrivers::DNS::Exception) do
-                driver.add_tag(tag: 'abc.123.super', sink: sink, encoder: Encoders::Hex)
+                driver.add_sink(tag: 'abc.123.super', sink: sink, encoder: Encoders::Hex)
               end
 
               # Make sure we CAN add tags that are part of the strings
-              driver.add_domain(domain: 'abc.123hi', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'abc.123hi', sink: sink, encoder: Encoders::Hex)
             ensure
               driver.kill
             end
@@ -303,18 +337,18 @@ module Dnscat2
               driver = Driver.new(host: '127.0.0.1', port: PORT)
               sink = MyTestSink.new(data: '1')
 
-              driver.add_domain(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
               assert_equal(['0.1.49.255'], @resolv.getaddresses('31313131.test.com').map(&:to_s).sort)
               driver.remove_domain(domain: 'test.com')
               assert_equal([], @resolv.getaddresses('31313131.test.com').map(&:to_s).sort)
-              driver.add_domain(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(domain: 'test.com', sink: sink, encoder: Encoders::Hex)
               assert_equal(['0.1.49.255'], @resolv.getaddresses('31313131.test.com').map(&:to_s).sort)
 
-              driver.add_tag(tag: 'abc', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(tag: 'abc', sink: sink, encoder: Encoders::Hex)
               assert_equal(['0.1.49.255'], @resolv.getaddresses('abc.31313131').map(&:to_s).sort)
               driver.remove_tag(tag: 'abc')
               assert_equal([], @resolv.getaddresses('abc.31313131').map(&:to_s).sort)
-              driver.add_tag(tag: 'abc', sink: sink, encoder: Encoders::Hex)
+              driver.add_sink(tag: 'abc', sink: sink, encoder: Encoders::Hex)
               assert_equal(['0.1.49.255'], @resolv.getaddresses('abc.31313131').map(&:to_s).sort)
             ensure
               driver.kill
@@ -331,7 +365,7 @@ module Dnscat2
                 host:     '127.0.0.1',
                 port:     '16243',
               )
-              driver.add_domain(
+              driver.add_sink(
                 domain:  'test.com',
                 sink:    sink,
                 encoder: Encoders::Hex,
@@ -397,13 +431,13 @@ module Dnscat2
               sink1 = MyTestSink.new(data: '')
               sink2 = MyTestSink.new(data: '')
 
-              driver.add_domain(
+              driver.add_sink(
                 domain: 'test.com',
                 sink:    sink1,
                 encoder: Encoders::Hex,
               )
 
-              driver.add_tag(
+              driver.add_sink(
                 tag:    'abc',
                 sink:    sink2,
                 encoder: Encoders::Base32,
@@ -432,7 +466,7 @@ module Dnscat2
               host:     '127.0.0.1',
               port:     '16243',
             )
-            driver.add_domain(
+            driver.add_sink(
               domain:  'test.com',
               sink:    sink,
               encoder: Encoders::Hex,
@@ -456,7 +490,7 @@ module Dnscat2
               host:     '127.0.0.1',
               port:     '16243',
             )
-            driver.add_domain(
+            driver.add_sink(
               domain:  'test.com',
               sink:    sink,
               encoder: Encoders::Base32,
@@ -480,7 +514,7 @@ module Dnscat2
               host:     '127.0.0.1',
               port:     '16243',
             )
-            driver.add_domain(
+            driver.add_sink(
               domain:  'test.com',
               sink:    sink,
               encoder: Encoders::Hex,
