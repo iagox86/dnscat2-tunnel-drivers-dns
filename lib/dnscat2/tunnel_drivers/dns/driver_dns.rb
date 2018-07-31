@@ -173,7 +173,7 @@ module Dnscat2
           transaction.answer!(answers)
 
         # A minor exception
-        rescue Exception => e
+        rescue Exception => e # rubocop:disable Lint/RescueException
           @l.error("TunnelDrivers::DNS An error occurred processing the DNS request: #{e}")
           transaction.error!(Nesser::RCODE_SERVER_FAILURE)
 
@@ -298,7 +298,7 @@ module Dnscat2
             add_domain(domain: domain, **args)
           end
 
-          if tag # rubocop:disable Style/GuardClause
+          if tag
             add_tag(tag: tag, **args)
           end
         end

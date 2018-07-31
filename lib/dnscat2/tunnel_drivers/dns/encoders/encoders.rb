@@ -32,4 +32,3 @@ module Dnscat2
     end
   end
 end
-
