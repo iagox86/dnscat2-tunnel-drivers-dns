@@ -327,28 +327,36 @@ And import using:
 The driver is initialized with the following:
 
     driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
-      tags:
-      domains:
-      sink:
       host:
       port:
-      [...optional settings]
+      passthrough:
     )
 
 The main parameters are:
-* `tags` is either nil, or an array of strings that represent valid tags (for
-  example, `["abc", "def", "ghi"]`).
-* `domains` is either nil, or an array of strings that represent valid domains
-  (for example, `["example.org", "skullseclabs.org"]`).
-* `sink` is the sink for old data, and the source for new. See the next section!
 * `host` is the host to listen on (`127.0.0.1`, `0.0.0.0`, etc)
 * `port` is the port to listen on (`53` is a nice choice)
+* `passthrough` is an upstream server (`"ip:port"`) to send unrecognized DNS
+  requests to, for stealth reasons. `nil` means that unhandled requests will
+  respond with a DNS error.
 
-The optional settings are:
+As soon as the class is created, a DNS server starts up and will listen for
+requests. Any requests that come in before a sink is added will respond with an
+error (or pass the request upstream, if that's set).
+
+After that, add one or more domains or tags. There are a number of functions for
+doing this, most of which are convenience functions, but they all come down to
+a function like `add_sink` or `add_sinks`. Those call `add_domain` or `add_tag`,
+based on the domains and tags you pass as arguments.
+
+The arguments you'll need are:
+* `domain` or `tag` (or `domains`/`tags`): a string or list of strings that this
+  particular sink will handle
+* `sink`: An implementation of a "sink" class (see below)
 * `encoder` is the encoder to use, as a string - either `"hex"` or "`base32`"
 
-Most of the communication is done with the sink. The `start()` and `stop()`
-methods are also pretty important. More information below!
+The sinks can also be removed, with `remove_domain` and `remove_tag`.
+
+And finally, `kill` stops the DNS server and removes all sinks.
 
 ### Sink
 
@@ -366,19 +374,10 @@ condition (`NXDomain` or `ServFail`). That's the best way to handle any kind of
 error condition at this level of the protocol (in theory, higher level
 protocols should have their own error handling mechanism).
 
-### Start and stop
-
-The driver doesn't immediately start listening for data. Instead, it sits idle
-until the `start()` method is called. At that point, it attempts to open a
-socket and start listening on the prescribed port.
-
-When everything is complete, the driver can be stopped with `stop()`, or the
-script can simply be exited.
-
 ### Errors
 
-Any errors that occur, such as calling `start()` or `stop()` in the wrong state,
-will raise a `Dnscat2::TunnelDrivers::DNS::Exception`.
+Any errors that occur, such as calling `kill()` in the wrong state, will raise
+a `Dnscat2::TunnelDrivers::DNS::Exception`.
 
 ### Wait
 
@@ -450,4 +449,5 @@ Or ANY:
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/iagox86/dnscat2-tunneldrivers-dns
+Bug reports and pull requests are welcome on GitHub at
+https://github.com/iagox86/dnscat2-tunneldrivers-dns
