@@ -141,6 +141,6 @@ driver.add_sinks(
   domains: domains,
   tags:    tags,
   sink:    Controller.new,
-  encoder: 'hex',
+  encoder: OPTS[:encoder],
 )
 driver.wait
