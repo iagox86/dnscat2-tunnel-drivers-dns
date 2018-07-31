@@ -35,7 +35,6 @@ module Dnscat2
         PORT = 16_243
 
         def setup
-          SingLogger.set_level_from_string(level: 'debug')
           @mutex = Mutex.new
           @resolv = ::Resolv::DNS.new(nameserver_port: [['127.0.0.1', PORT]])
         end

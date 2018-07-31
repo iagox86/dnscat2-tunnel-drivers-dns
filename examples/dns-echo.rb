@@ -55,17 +55,22 @@ OPTS = Trollop.options do
   opt(
     :tags,   'The tags (prefixes) to use, comma-separated',
     type:    :string,
-    default: nil
+    default: DEFAULT_TAGS
   )
   opt(
     :domains, 'The domains to use, comma-separated',
     type:     :string,
-    default:  nil
+    default:  DEFAULT_DOMAINS
   )
   opt(
     :passthrough, 'Upstream DNS to forward unknown requests to',
     type:         :string,
     default:      nil
+  )
+  opt(
+    :encoder, "The encoder to use ('hex' or 'base32')",
+    type:     :string,
+    default:  'hex'
   )
 
   opt(
