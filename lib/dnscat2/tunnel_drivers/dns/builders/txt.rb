@@ -40,8 +40,8 @@ module Dnscat2
           ##
           public
           def max_length
-            # -3 for the length prefixes (two bytes, then one byte)
-            return ((MAX_RR_LENGTH - 3) / @encoder::RATIO).floor
+            # Max length of a TXT record is straight up 255 bytes
+            return (255 / @encoder::RATIO).floor
           end
 
           ##

@@ -11,6 +11,7 @@
 require 'nesser'
 require 'singlogger'
 
+require 'dnscat2/tunnel_drivers/dns/builders/builder_helper'
 require 'dnscat2/tunnel_drivers/dns/encoders/base32'
 require 'dnscat2/tunnel_drivers/dns/encoders/hex'
 require 'dnscat2/tunnel_drivers/dns/exception'
@@ -24,6 +25,8 @@ module Dnscat2
         # max length.
         ##
         class NameHelper
+          include BuilderHelper
+
           ENCODERS = [
             Encoders::Hex,
             Encoders::Base32,
@@ -36,11 +39,10 @@ module Dnscat2
           #  the 'www' of 'www.google.com') - 63 is a safe bet
           # encoder: An encoder that implements encode() and decode() functions
           #  (probably from the encoders/ folder)
-          # extra_bytes: Extra bytes that need to be reserved as part of the
           #  record (for example, MX packets need 2 extra bytes for the
           #  `preference` field).
           public
-          def initialize(tag:, domain:, max_subdomain_length: 63, encoder: Encoders::Hex, extra_bytes:)
+          def initialize(tag:, domain:, max_subdomain_length: 63, encoder: Encoders::Hex)
             @l = SingLogger.instance
             @tag = tag == '' ? nil : tag
             @domain = domain == '' ? nil : domain
@@ -61,8 +63,6 @@ module Dnscat2
               raise(Exception, "Invalid encoder: #{encoder}")
             end
             @encoder = encoder
-
-            @extra_bytes = extra_bytes
           end
 
           private
@@ -79,10 +79,7 @@ module Dnscat2
           public
           def max_length
             # Start with the max resource record length
-            max_total_length = MAX_RR_LENGTH
-
-            # Remove the 'extra' bytes (ie, the length, preference, etc fields)
-            max_total_length -= @extra_bytes
+            max_total_length = MAX_NAME_LENGTH
 
             # Remove the final NUL terminator
             max_total_length -= 1
