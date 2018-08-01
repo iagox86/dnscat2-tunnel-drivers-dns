@@ -98,7 +98,7 @@ end
 SingLogger.set_level_from_string(level: OPTS[:debug])
 
 if !OPTS[:tags] && !OPTS[:domains]
-  raise(ArgumentException, 'You need to specify either a tag or a domain!')
+  raise(ArgumentError, 'You need to specify either a tag or a domain!')
 end
 
 tags    = OPTS[:tags]    ? OPTS[:tags].split(/ *, */)    : []
