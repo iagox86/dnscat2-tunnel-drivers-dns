@@ -445,7 +445,18 @@ Or ANY:
     0.4.68.67
     1.66.65.255
 
+### dns-discard
 
+[dns-discard](examples/dns-discard.rb) simply accepts a request, and returns
+nothing. Depending on arguments, that nothing can be a blank message or an
+error. Different options let you test different error-handling code (such as by
+raising different kinds of exceptions).
+
+### dns-chargen
+
+[dns-chargen](examples/dns-chargen.rb) generates a random stream of text that is
+the maximum size of the packet. This makes it easy to ensure that our maximum
+size works and can make it through real DNS servers.
 
 ## Contributing
 
