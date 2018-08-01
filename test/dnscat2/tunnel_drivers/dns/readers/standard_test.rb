@@ -16,113 +16,71 @@ module Dnscat2
       module Readers
         class StandardTest < ::Test::Unit::TestCase
           def setup
-            @reader = Standard.new(tags: ['abc'], domains: ['test.com', 'test2.com'])
+            @reader = Readers::Standard.new
           end
 
           def test_unrecognized
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'hello.this.com', type: 1, cls: 1))
+            data = @reader.try_domain(name: 'hello.this.com', domain: 'test.com', encoder: Encoders::Hex)
             assert_nil(data)
-            assert_nil(tag)
-            assert_nil(domain)
 
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '.com', type: 1, cls: 1))
+            data = @reader.try_tag(name: 'hello.this.com', tag: 'abc', encoder: Encoders::Hex)
             assert_nil(data)
-            assert_nil(tag)
-            assert_nil(domain)
+          end
 
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'com', type: 1, cls: 1))
+          def test_known_domain_and_tag
+            data = @reader.try_domain(name: '41414141.test.com', domain: 'test.com', encoder: Encoders::Hex)
+            assert_equal('AAAA', data)
+
+            data = @reader.try_tag(name: 'abc.41414141', tag: 'abc', encoder: Encoders::Hex)
+            assert_equal('AAAA', data)
+          end
+
+          def test_periods_matter_when_they_matter
+            data = @reader.try_domain(name: '414141.41test.com', domain: 'test.com', encoder: Encoders::Hex)
             assert_nil(data)
-            assert_nil(tag)
-            assert_nil(domain)
 
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '', type: 1, cls: 1))
+            data = @reader.try_tag(name: 'abc41.414141', tag: 'abc', encoder: Encoders::Hex)
             assert_nil(data)
-            assert_nil(tag)
-            assert_nil(domain)
           end
 
-          def test_known_domain
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '414141.test.com', type: 1, cls: 1))
-            assert_equal('AAA', data)
-            assert_equal(nil, tag)
-            assert_equal('test.com', domain)
+          def test_periods_dont_matter_when_they_dont_matter
+            data = @reader.try_domain(name: '4.14.141.41.test.com', domain: 'test.com', encoder: Encoders::Hex)
+            assert_equal('AAAA', data)
+
+            data = @reader.try_tag(name: 'abc.41.414.14.1', tag: 'abc', encoder: Encoders::Hex)
+            assert_equal('AAAA', data)
           end
 
-          def test_other_known_domain
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '41414142.test2.com', type: 1, cls: 1))
-            assert_equal('AAAB', data)
-            assert_equal(nil, tag)
-            assert_equal('test2.com', domain)
+          def test_case_is_insensitive_in_tag_and_domain
+            data = @reader.try_domain(name: '41414141.tEST.COm', domain: 'test.com', encoder: Encoders::Hex)
+            assert_equal('AAAA', data)
+
+            data = @reader.try_tag(name: 'aBc.41414141', tag: 'abc', encoder: Encoders::Hex)
+            assert_equal('AAAA', data)
           end
 
-          def test_domain_periods_matter
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '414141.41test.com', type: 1, cls: 1))
-            assert_nil(data)
-            assert_nil(tag)
-            assert_nil(domain)
-          end
+          def test_case_is_insensitive_in_data
+            data = @reader.try_domain(name: '4a4B4c4D.test.com', domain: 'test.com', encoder: Encoders::Hex)
+            assert_equal('JKLM', data)
 
-          def test_known_tag
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'abc.414141', type: 1, cls: 1))
-            assert_equal('AAA', data)
-            assert_equal('abc', tag)
-            assert_equal(nil, domain)
-          end
-
-          def test_case_insensitive_tag
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'aBc.414141', type: 1, cls: 1))
-            assert_equal('AAA', data)
-            assert_equal('abc', tag)
-            assert_equal(nil, domain)
-          end
-
-          def test_tag_periods_matter
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'abc41.414141', type: 1, cls: 1))
-            assert_nil(data)
-            assert_nil(tag)
-            assert_nil(domain)
-          end
-
-          def test_case_insensitive_domain
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '414141.tESt.com', type: 1, cls: 1))
-            assert_equal('AAA', data)
-            assert_equal(nil, tag)
-            assert_equal('test.com', domain)
-          end
-
-          def test_domain_has_priority
-            reader = Standard.new(tags: ['414141'], domains: ['434343'])
-            data, tag, domain = reader.read_data(question: Nesser::Question.new(name: '414141.424242.434343', type: 1, cls: 1))
-            assert_equal('AAABBB', data)
-            assert_equal(nil, tag)
-            assert_equal('434343', domain)
+            data = @reader.try_tag(name: 'abc.4D4c4B4a', tag: 'abc', encoder: Encoders::Hex)
+            assert_equal('MLKJ', data)
           end
 
           def test_no_data
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '.test.com', type: 1, cls: 1))
+            data = @reader.try_domain(name: 'test.com', domain: 'test.com', encoder: Encoders::Hex)
             assert_equal('', data)
-            assert_nil(tag)
-            assert_equal('test.com', domain)
 
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: 'test.com', type: 1, cls: 1))
+            data = @reader.try_tag(name: 'abc', tag: 'abc', encoder: Encoders::Hex)
             assert_equal('', data)
-            assert_nil(tag)
-            assert_equal('test.com', domain)
           end
 
           def test_base32
-            reader = Standard.new(tags: ['abc'], domains: ['test.com', 'test2.com'], encoder: Encoders::Base32)
-            data, tag, domain = reader.read_data(question: Nesser::Question.new(name: 'ifaucqi.test.com', type: 1, cls: 1))
+            data = @reader.try_domain(name: 'ifaucqi.test.com', domain: 'test.com', encoder: Encoders::Base32)
             assert_equal('AAAA', data)
-            assert_nil(tag)
-            assert_equal('test.com', domain)
-          end
 
-          def test_weird_periods
-            data, tag, domain = @reader.read_data(question: Nesser::Question.new(name: '4.141.test.com', type: 1, cls: 1))
-            assert_equal('AA', data)
-            assert_nil(tag)
-            assert_equal('test.com', domain)
+            data = @reader.try_tag(name: 'abc.ifaucqi', tag: 'abc', encoder: Encoders::Base32)
+            assert_equal('AAAA', data)
           end
         end
       end

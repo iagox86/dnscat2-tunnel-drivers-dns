@@ -54,3 +54,6 @@ Style/FormatStringToken:
 
 Style/WordArray:
   Enabled: false
+
+Style/GuardClause:
+  Enabled: false

@@ -55,17 +55,22 @@ OPTS = Trollop.options do
   opt(
     :tags,   'The tags (prefixes) to use, comma-separated',
     type:    :string,
-    default: nil
+    default: DEFAULT_TAGS
   )
   opt(
     :domains, 'The domains to use, comma-separated',
     type:     :string,
-    default:  nil
+    default:  DEFAULT_DOMAINS
   )
   opt(
     :passthrough, 'Upstream DNS to forward unknown requests to',
     type:         :string,
     default:      nil
+  )
+  opt(
+    :encoder, "The encoder to use ('hex' or 'base32')",
+    type:     :string,
+    default:  'hex'
   )
 
   opt(
@@ -96,8 +101,8 @@ if !OPTS[:tags] && !OPTS[:domains]
   raise(ArgumentException, 'You need to specify either a tag or a domain!')
 end
 
-tags    = OPTS[:tags]    ? OPTS[:tags].split(/ *, */)    : nil
-domains = OPTS[:domains] ? OPTS[:domains].split(/ *, */) : nil
+tags    = OPTS[:tags]    ? OPTS[:tags].split(/ *, */)    : []
+domains = OPTS[:domains] ? OPTS[:domains].split(/ *, */) : []
 
 ##
 # A simple controller to handle incoming messages.
@@ -133,13 +138,14 @@ class Controller
 end
 
 driver = Dnscat2::TunnelDrivers::DNS::Driver.new(
-  tags:        tags,
-  domains:     domains,
-  sink:        Controller.new,
   host:        OPTS[:host],
   port:        OPTS[:port],
-  encoder:     OPTS[:encoder],
   passthrough: OPTS[:passthrough],
 )
-driver.start
+driver.add_sinks(
+  domains: domains,
+  tags:    tags,
+  sink:    Controller.new,
+  encoder: OPTS[:encoder],
+)
 driver.wait
