@@ -216,9 +216,13 @@ module Dnscat2
           end
 
           # Create the socket and start the listener
-          @s = UDPSocket.new
-          @nesser = Nesser::Nesser.new(s: @s, logger: @l, host: @host, port: @port) do |transaction|
-            _handle_transaction(transaction: transaction)
+          begin
+            @s = ::UDPSocket.new
+            @nesser = ::Nesser::Nesser.new(s: @s, logger: @l, host: @host, port: @port) do |transaction|
+              _handle_transaction(transaction: transaction)
+            end
+          rescue ::StandardError => e
+            raise(Exception, "Error starting the DNS server: #{e}")
           end
 
           # Create tags and domains lists
