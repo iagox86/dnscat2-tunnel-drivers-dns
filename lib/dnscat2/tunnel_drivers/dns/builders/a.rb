@@ -54,10 +54,6 @@ module Dnscat2
               raise(Exception, 'Tried to encode too much data!')
             end
 
-            if data.length > 255
-              raise(Exception, 'Tried to encode more than 255 bytes of data!')
-            end
-
             # Prefix with length
             data = [data.length, data].pack('Ca*')
 
@@ -67,6 +63,10 @@ module Dnscat2
             data = data.chars.each_slice(3).map(&:join).map do |ip|
               ip = [i] + ip.ljust(3, "\xFF").bytes
               i += 1
+
+              if i > 255
+                raise(Exception, 'Tried to encode more than 255 ip addresses!')
+              end
 
               ::Kernel.format('%d.%d.%d.%d', ip[0], ip[1], ip[2], ip[3])
             end

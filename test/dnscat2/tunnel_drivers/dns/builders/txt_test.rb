@@ -16,10 +16,6 @@ module Dnscat2
             @builder = TXT.new(tag: 'abc', domain: 'def')
           end
 
-          def test_max_length
-            assert_equal(125, @builder.max_length)
-          end
-
           def test_encode_blank
             rr = @builder.build(data: '').pop
 

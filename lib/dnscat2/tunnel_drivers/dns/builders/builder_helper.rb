@@ -14,7 +14,8 @@ module Dnscat2
   module TunnelDrivers
     module DNS
       module Builders
-        MAX_RR_LENGTH = 253
+        MAX_RR_LENGTH = 300
+        MAX_NAME_LENGTH = 254
 
         ##
         # Helper mixin for writing builders.

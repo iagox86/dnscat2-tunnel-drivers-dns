@@ -53,10 +53,10 @@ module Dnscat2
 
           def test_encode_max_bytes
             rrs = @builder.build(data: 'A' * @builder.max_length)
-            assert_equal(63, rrs.length)
-            assert_equal('0.188.65.65', rrs[0].address.to_s)
+            assert_equal(75, rrs.length)
+            assert_equal('0.224.65.65', rrs[0].address.to_s)
 
-            1.upto(62) do |i|
+            1.upto(74) do |i|
               assert_equal("#{i}.65.65.65", rrs[i].address.to_s)
             end
           end

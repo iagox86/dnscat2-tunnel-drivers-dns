@@ -26,8 +26,7 @@ module Dnscat2
 
           public
           def initialize(tag:, domain:, max_subdomain_length: 63, encoder: Encoders::Hex)
-            # CNAME has 4 extra bytes: the 2-byte length field
-            super(tag: tag, domain: domain, max_subdomain_length: max_subdomain_length, encoder: encoder, extra_bytes: 2)
+            super(tag: tag, domain: domain, max_subdomain_length: max_subdomain_length, encoder: encoder)
 
             @l = SingLogger.instance
           end
